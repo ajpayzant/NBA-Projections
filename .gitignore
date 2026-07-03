@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# DuckDB
+data/analytics_database/*.duckdb
+data/analytics_database/*.duckdb-wal
+data/analytics_database/*.duckdb-shm
+
+# Raw API cache
+data/raw_cache/
+
+# Session / projection output
+data/session_autosave.json
+data/saved_projections/
+projection_*.json
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Env files
+.env
+.env.local

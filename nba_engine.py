@@ -1,0 +1,1037 @@
+"""
+NBA Projection Engine
+=====================
+Architecture:
+  NBADataLoader         — load from DuckDB
+  NBATeamModel          — EWM team ratings + RF correction blend
+  NBAPlayerModel        — minutes projection → rate × min → normalize to team total
+  NBASimulator          — Monte Carlo (20,000 sims) for all stat distributions
+  NBAPricingEngine      — convert distributions to prop lines and fair odds
+  NBAProjectionEngine   — orchestrates all the above
+
+Key design decisions:
+  - Minutes first: projected minutes drives everything else
+  - Rate × minutes: cleaner than raw counts for injury/override scenarios
+  - Injury rating (0.0–1.0) scales minutes before any other projection
+  - Team normalization: player totals are reconciled to match team projection
+  - EWM half-life=8 games for all player rates (tuned for 82-game season)
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import warnings
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+try:
+    import duckdb
+except ImportError as e:
+    raise ImportError("duckdb required: pip install duckdb") from e
+
+logger = logging.getLogger("nba.engine")
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+# League averages (2024-25 season)
+LG_PTS:  float = 113.0
+LG_REB:  float = 43.8
+LG_AST:  float = 26.5
+LG_STL:  float = 7.7
+LG_BLK:  float = 4.9
+LG_TOV:  float = 13.5
+LG_FG3M: float = 13.1
+LG_PACE: float = 100.6
+LG_MIN_PER_PLAYER: float = 24.0   # average minutes for an active player
+
+# EWM half-life (games)
+HL_STATS:   int = 8
+HL_SHOOT:   int = 12   # shooting % is more stable
+HL_MINUTES: int = 6    # minutes more responsive to recent role changes
+
+# Injury rating → minutes multiplier mapping
+# 0.0 = healthy (1.0x), 1.0 = out (0.0x)
+def injury_minutes_mult(rating: float) -> float:
+    """Linear map: 0.0→1.0, 0.25→0.80, 0.50→0.55, 0.75→0.20, 1.0→0.0"""
+    return float(np.clip(1.0 - rating, 0.0, 1.0))
+
+# Simulation
+N_SIMS = 20_000
+
+# Prop stat combinations
+COMBO_STATS = {
+    "PRA":   ["PTS", "REB", "AST"],
+    "PR":    ["PTS", "REB"],
+    "PA":    ["PTS", "AST"],
+    "RA":    ["REB", "AST"],
+}
+
+# ---------------------------------------------------------------------------
+# Dataclasses
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TeamProjection:
+    team_id:        int
+    team_abbr:      str
+    team_name:      str
+    opp_team_id:    int
+    opp_team_abbr:  str
+    proj_pts:       float
+    proj_reb:       float
+    proj_ast:       float
+    proj_tov:       float
+    proj_fg3m:      float
+    proj_pace:      float
+    proj_win_prob:  float = 0.5
+    confidence:     float = 0.5
+
+
+@dataclass
+class PlayerProjection:
+    player_id:      int
+    player_name:    str
+    team_abbr:      str
+    position:       str
+    pos_group:      str   # G / F / C / UNK
+    proj_min:       float
+    proj_pts:       float
+    proj_reb:       float
+    proj_ast:       float
+    proj_stl:       float
+    proj_blk:       float
+    proj_tov:       float
+    proj_fg3m:      float
+    # Derived combos
+    proj_pra:       float = 0.0
+    proj_pr:        float = 0.0
+    proj_pa:        float = 0.0
+    proj_ra:        float = 0.0
+    # Shooting rates (for sim distribution shape)
+    fg_pct:         float = 0.46
+    fg3_pct:        float = 0.36
+    ft_pct:         float = 0.77
+    # Overrideable
+    active:         bool  = True
+    injury_rating:  float = 0.0    # 0.0=healthy … 1.0=out
+    minutes_override: Optional[float] = None
+    usage_override: Optional[float] = None
+    # Internal
+    games_played:   int   = 0
+    confidence:     float = 0.5
+    _pts_overridden: bool = False
+    _min_overridden: bool = False
+
+
+@dataclass
+class PlayerSimulation:
+    player_id:   int
+    player_name: str
+    stat_distributions: Dict[str, np.ndarray] = field(default_factory=dict)
+    proj_values:        Dict[str, float]      = field(default_factory=dict)
+    prop_lines:         Dict[str, float]      = field(default_factory=dict)
+
+
+@dataclass
+class GameSimulation:
+    n_sims:         int
+    home_pts:       np.ndarray
+    away_pts:       np.ndarray
+    home_win_prob:  float
+    away_win_prob:  float
+    spread_home:    float
+    expected_total: float
+    total_distribution: np.ndarray
+    margin_distribution: np.ndarray
+
+
+@dataclass
+class GameMarket:
+    home_ml:        str
+    away_ml:        str
+    home_win_prob:  float
+    away_win_prob:  float
+    spread_home:    float
+    spread_home_odds: str
+    spread_away_odds: str
+    total_line:     float
+    over_odds:      str
+    under_odds:     str
+
+
+@dataclass
+class ProjectionResult:
+    game_id:          str
+    home_team:        str
+    away_team:        str
+    home_proj:        TeamProjection
+    away_proj:        TeamProjection
+    home_players:     List[PlayerProjection]
+    away_players:     List[PlayerProjection]
+    game_sim:         GameSimulation
+    home_player_sims: List[PlayerSimulation]
+    away_player_sims: List[PlayerSimulation]
+    game_market:      GameMarket
+    player_markets:   Dict[str, Dict]
+    generated_at:     str
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _nan(x, default: float = 0.0) -> float:
+    if x is None:
+        return default
+    try:
+        v = float(x)
+        return v if np.isfinite(v) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _ewm_last(series: pd.Series, halflife: int) -> float:
+    """Return the last EWM value of a series (leakage-safe already applied in warehouse)."""
+    s = series.dropna()
+    if s.empty:
+        return np.nan
+    return float(s.ewm(halflife=halflife, min_periods=1).mean().iloc[-1])
+
+
+def _nearest_half(v: float) -> float:
+    """Round to nearest 0.5 for prop lines."""
+    return round(v * 2) / 2
+
+
+def _prob_to_american(p: float, hold_pct: float = 0.05) -> str:
+    p = float(np.clip(p, 0.01, 0.99))
+    # Apply hold (vig)
+    p_adj = p * (1 + hold_pct)
+    if p_adj >= 0.50:
+        odds = -round((p_adj / (1 - p_adj)) * 100)
+    else:
+        odds = round(((1 - p_adj) / p_adj) * 100)
+    if odds > 0:
+        return f"+{odds}"
+    return str(odds)
+
+
+# ---------------------------------------------------------------------------
+# Class 1: NBADataLoader
+# ---------------------------------------------------------------------------
+
+class NBADataLoader:
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+
+    def _conn(self):
+        return duckdb.connect(self.db_path, read_only=True)
+
+    def load_player_games(self) -> pd.DataFrame:
+        con = self._conn()
+        try:
+            return con.execute("SELECT * FROM clean.player_game_stats").df()
+        finally:
+            con.close()
+
+    def load_team_games(self) -> pd.DataFrame:
+        con = self._conn()
+        try:
+            return con.execute("SELECT * FROM clean.team_game_stats").df()
+        finally:
+            con.close()
+
+    def load_schedule(self) -> pd.DataFrame:
+        con = self._conn()
+        try:
+            return con.execute("SELECT * FROM clean.game_schedule ORDER BY game_date").df()
+        except Exception:
+            return pd.DataFrame()
+        finally:
+            con.close()
+
+    def load_player_info(self) -> pd.DataFrame:
+        con = self._conn()
+        try:
+            return con.execute("SELECT * FROM clean.player_info").df()
+        except Exception:
+            return pd.DataFrame()
+        finally:
+            con.close()
+
+    def load_team_season_stats(self) -> pd.DataFrame:
+        con = self._conn()
+        try:
+            return con.execute("""
+                SELECT TEAM_ABBREVIATION, SEASON,
+                    AVG(TEAM_PTS) AS pts_pg, AVG(TEAM_REB) AS reb_pg,
+                    AVG(TEAM_AST) AS ast_pg, AVG(TEAM_TOV) AS tov_pg,
+                    AVG(TEAM_FG3M) AS fg3m_pg, AVG(PACE) AS pace,
+                    AVG(TEAM_PTS_EWM) AS pts_ewm, AVG(PACE_EWM) AS pace_ewm
+                FROM clean.team_game_stats
+                GROUP BY TEAM_ABBREVIATION, SEASON
+            """).df()
+        finally:
+            con.close()
+
+
+# ---------------------------------------------------------------------------
+# Class 2: NBATeamModel
+# ---------------------------------------------------------------------------
+
+class NBATeamModel:
+    """
+    Projects team totals using EWM ratings with an optional RF correction.
+
+    Outputs: projected PTS, REB, AST, TOV, FG3M, PACE for each team.
+    Win probability is derived from projected point differential.
+    """
+
+    def __init__(self):
+        self._rf_models: Dict[str, object] = {}
+        self._rf_scalers: Dict[str, object] = {}
+        self._fitted = False
+        self._lg: Dict[str, float] = {}
+
+    def fit(self, team_games: pd.DataFrame) -> None:
+        """Fit EWM league averages and optional RF corrections."""
+        if team_games.empty:
+            return
+
+        # League averages from current data
+        for col, key, default in [
+            ("TEAM_PTS", "pts", LG_PTS), ("TEAM_REB", "reb", LG_REB),
+            ("TEAM_AST", "ast", LG_AST), ("TEAM_TOV", "tov", LG_TOV),
+            ("TEAM_FG3M", "fg3m", LG_FG3M), ("PACE", "pace", LG_PACE),
+        ]:
+            if col in team_games.columns:
+                self._lg[key] = float(team_games[col].mean())
+            else:
+                self._lg[key] = default
+
+        # RF correction on recent data
+        try:
+            from sklearn.ensemble import GradientBoostingRegressor
+            from sklearn.preprocessing import StandardScaler
+
+            feat_cols = [c for c in team_games.columns
+                         if c.endswith("_EWM") or c.endswith("_AVG5")
+                         and not c.endswith("_POST")]
+            feat_cols = [c for c in feat_cols if team_games[c].notna().sum() > 50]
+
+            for target in ["TEAM_PTS", "TEAM_AST", "PACE"]:
+                if target not in team_games.columns:
+                    continue
+                df_ = team_games[feat_cols + [target]].dropna()
+                if len(df_) < 100:
+                    continue
+                X = df_[feat_cols].values
+                y = df_[target].values
+                scaler = StandardScaler()
+                Xs = scaler.fit_transform(X)
+                mdl = GradientBoostingRegressor(
+                    n_estimators=100, max_depth=4, learning_rate=0.05,
+                    subsample=0.8, random_state=42
+                )
+                mdl.fit(Xs, y)
+                self._rf_models[target] = mdl
+                self._rf_scalers[target] = scaler
+                self._rf_feat_cols = feat_cols
+        except Exception as e:
+            logger.debug("RF correction fit skipped: %s", e)
+
+        self._fitted = True
+
+    def predict(self, team_r: Dict, opp_r: Dict) -> TeamProjection:
+        """Predict team stats for one team given their and opponent's ratings."""
+        def _get(d, key, default):
+            return _nan(d.get(key), default)
+
+        # EWM-based projections
+        proj_pts  = _get(team_r, "TEAM_PTS_EWM",  self._lg.get("pts",  LG_PTS))
+        proj_reb  = _get(team_r, "TEAM_REB_EWM",  self._lg.get("reb",  LG_REB))
+        proj_ast  = _get(team_r, "TEAM_AST_EWM",  self._lg.get("ast",  LG_AST))
+        proj_tov  = _get(team_r, "TEAM_TOV_EWM",  self._lg.get("tov",  LG_TOV))
+        proj_fg3m = _get(team_r, "TEAM_FG3M_EWM", self._lg.get("fg3m", LG_FG3M))
+        proj_pace = _get(team_r, "PACE_EWM",       self._lg.get("pace", LG_PACE))
+
+        # Opponent defensive adjustment — how many pts does opponent allow vs league avg?
+        opp_pts_allowed_ewm = _get(opp_r, "TEAM_PTS_EWM", self._lg.get("pts", LG_PTS))
+        lg_pts = self._lg.get("pts", LG_PTS)
+        if lg_pts > 0:
+            opp_def_mult = float(np.clip(opp_pts_allowed_ewm / lg_pts, 0.85, 1.15))
+            proj_pts = proj_pts * opp_def_mult
+
+        # Pace blending (average of both teams)
+        opp_pace = _get(opp_r, "PACE_EWM", proj_pace)
+        proj_pace = 0.5 * proj_pace + 0.5 * opp_pace
+
+        # RF correction blend (25%)
+        if self._rf_models and hasattr(self, "_rf_feat_cols"):
+            try:
+                feat_vals = np.array([
+                    _nan(team_r.get(c), 0.0) for c in self._rf_feat_cols
+                ]).reshape(1, -1)
+                for target, attr in [("TEAM_PTS", "proj_pts"), ("TEAM_AST", "proj_ast"), ("PACE", "proj_pace")]:
+                    if target in self._rf_models:
+                        Xs = self._rf_scalers[target].transform(feat_vals)
+                        rf_pred = float(self._rf_models[target].predict(Xs)[0])
+                        if attr == "proj_pts":
+                            proj_pts  = 0.75 * proj_pts  + 0.25 * rf_pred
+                        elif attr == "proj_ast":
+                            proj_ast  = 0.75 * proj_ast  + 0.25 * rf_pred
+                        elif attr == "proj_pace":
+                            proj_pace = 0.75 * proj_pace + 0.25 * rf_pred
+            except Exception:
+                pass
+
+        return TeamProjection(
+            team_id=int(_nan(team_r.get("TEAM_ID"), 0)),
+            team_abbr=str(team_r.get("TEAM_ABBREVIATION", "")),
+            team_name=str(team_r.get("TEAM_NAME", "")),
+            opp_team_id=int(_nan(opp_r.get("TEAM_ID"), 0)),
+            opp_team_abbr=str(opp_r.get("TEAM_ABBREVIATION", "")),
+            proj_pts=max(proj_pts, 80.0),
+            proj_reb=max(proj_reb, 30.0),
+            proj_ast=max(proj_ast, 15.0),
+            proj_tov=max(proj_tov, 8.0),
+            proj_fg3m=max(proj_fg3m, 5.0),
+            proj_pace=max(proj_pace, 88.0),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Class 3: NBAPlayerModel
+# ---------------------------------------------------------------------------
+
+class NBAPlayerModel:
+    """
+    Projects per-player stats using the rate × minutes approach.
+
+    Pipeline:
+      1. Project minutes for each player
+      2. Apply injury rating multiplier to minutes
+      3. Project rates (pts/min, reb/min, ast/min, etc.) from EWM history
+      4. Multiply rate × effective minutes to get raw projections
+      5. Normalize player totals to match team projection
+    """
+
+    # Default rates by position group (when player has no history)
+    _POS_DEFAULTS: Dict[str, Dict[str, float]] = {
+        "G":   {"min": 26.0, "pts_pm": 0.60, "reb_pm": 0.13, "ast_pm": 0.20,
+                "stl_pm": 0.04, "blk_pm": 0.01, "tov_pm": 0.07, "fg3m_pm": 0.10},
+        "F":   {"min": 26.0, "pts_pm": 0.52, "reb_pm": 0.30, "ast_pm": 0.10,
+                "stl_pm": 0.03, "blk_pm": 0.03, "tov_pm": 0.06, "fg3m_pm": 0.06},
+        "C":   {"min": 24.0, "pts_pm": 0.50, "reb_pm": 0.45, "ast_pm": 0.07,
+                "stl_pm": 0.02, "blk_pm": 0.05, "tov_pm": 0.07, "fg3m_pm": 0.02},
+        "UNK": {"min": 20.0, "pts_pm": 0.50, "reb_pm": 0.25, "ast_pm": 0.12,
+                "stl_pm": 0.03, "blk_pm": 0.02, "tov_pm": 0.06, "fg3m_pm": 0.06},
+    }
+
+    def __init__(self, player_games: pd.DataFrame, player_info: pd.DataFrame):
+        self.pg = player_games.copy()
+        self.pi = player_info.copy()
+        self._player_ratings: Dict[int, Dict] = {}
+        self._build_ratings()
+
+    def _build_ratings(self) -> None:
+        """Build per-player rating dicts from EWM columns in player_games."""
+        if self.pg.empty:
+            return
+
+        ewm_cols = [c for c in self.pg.columns if c.endswith("_EWM")]
+        id_cols = ["PLAYER_ID", "PLAYER_NAME", "TEAM_ABBREVIATION", "POSITION",
+                   "POS_GROUP", "SEASON", "GAME_DATE"] + ewm_cols
+        id_cols = [c for c in id_cols if c in self.pg.columns]
+
+        # Take the last row per player (most recent EWM state)
+        latest = (
+            self.pg[id_cols]
+            .sort_values(["PLAYER_ID", "GAME_DATE"] if "GAME_DATE" in id_cols else ["PLAYER_ID"])
+            .groupby("PLAYER_ID")
+            .last()
+            .reset_index()
+        )
+
+        # Count games played
+        gp = self.pg.groupby("PLAYER_ID").size().rename("games_played")
+        latest = latest.merge(gp, on="PLAYER_ID", how="left")
+        latest["games_played"] = latest["games_played"].fillna(0).astype(int)
+
+        for _, row in latest.iterrows():
+            pid = int(row["PLAYER_ID"])
+            self._player_ratings[pid] = row.to_dict()
+
+    def get_team_roster(self, team_abbr: str, season: Optional[str] = None) -> List[Dict]:
+        """Return all player ratings for a team in the current season."""
+        if self.pg.empty:
+            return []
+
+        mask = self.pg["TEAM_ABBREVIATION"].astype(str).str.upper() == team_abbr.upper()
+        if season and "SEASON" in self.pg.columns:
+            # Prefer current season, fall back to most recent
+            curr_mask = mask & (self.pg["SEASON"] == season)
+            if curr_mask.any():
+                mask = curr_mask
+
+        team_pids = self.pg[mask]["PLAYER_ID"].dropna().astype(int).unique()
+        return [self._player_ratings[pid] for pid in team_pids if pid in self._player_ratings]
+
+    def _get_rate(self, ratings: Dict, rate_col: str, pos: str, default_key: str) -> float:
+        val = _nan(ratings.get(rate_col), np.nan)
+        if np.isnan(val):
+            val = self._POS_DEFAULTS.get(pos, self._POS_DEFAULTS["UNK"]).get(default_key, 0.0)
+        return float(val)
+
+    def project_player(
+        self,
+        ratings: Dict,
+        team_proj: TeamProjection,
+        overrides: Optional[Dict] = None,
+    ) -> PlayerProjection:
+        """Project one player given their EWM ratings and team projection."""
+        ov = overrides or {}
+        pos = str(ratings.get("POS_GROUP", ratings.get("POSITION", "UNK")))
+        if pos not in ("G", "F", "C"):
+            pos = "UNK"
+        pos_def = self._POS_DEFAULTS.get(pos, self._POS_DEFAULTS["UNK"])
+        gp = int(_nan(ratings.get("games_played"), 0))
+
+        # ── Minutes ───────────────────────────────────────────────────────────
+        min_overridden = False
+        if "minutes_override" in ov and ov["minutes_override"] is not None:
+            proj_min = float(ov["minutes_override"])
+            min_overridden = True
+        else:
+            proj_min = _nan(ratings.get("MIN_EWM"), pos_def["min"])
+
+        # Injury rating reduces minutes
+        injury = float(ov.get("injury_rating", _nan(ratings.get("injury_rating"), 0.0)))
+        injury = float(np.clip(injury, 0.0, 1.0))
+        proj_min = proj_min * injury_minutes_mult(injury)
+        proj_min = float(np.clip(proj_min, 0.0, 48.0))
+
+        # ── Rates (per minute) ────────────────────────────────────────────────
+        pts_pm  = self._get_rate(ratings, "PTS_PM_EWM",  pos, "pts_pm")
+        reb_pm  = self._get_rate(ratings, "REB_PM_EWM",  pos, "reb_pm")
+        ast_pm  = self._get_rate(ratings, "AST_PM_EWM",  pos, "ast_pm")
+        stl_pm  = self._get_rate(ratings, "STL_PM_EWM",  pos, "stl_pm")
+        blk_pm  = self._get_rate(ratings, "BLK_PM_EWM",  pos, "blk_pm")
+        tov_pm  = self._get_rate(ratings, "TOV_PM_EWM",  pos, "tov_pm")
+        fg3m_pm = self._get_rate(ratings, "FG3M_PM_EWM", pos, "fg3m_pm")
+
+        # Opponent adjustment on scoring (±10% cap)
+        opp_def_mult = 1.0
+        if team_proj.proj_pts > 0:
+            lg_pts_per_min = LG_PTS / (5 * LG_MIN_PER_PLAYER)
+            # Implicit: team model already adjusts for opponent, just apply proportionally
+            opp_def_mult = float(np.clip(team_proj.proj_pts / max(LG_PTS, 1.0), 0.90, 1.10))
+        pts_pm = pts_pm * opp_def_mult
+
+        # ── Raw projections ───────────────────────────────────────────────────
+        proj_pts  = pts_pm  * proj_min
+        proj_reb  = reb_pm  * proj_min
+        proj_ast  = ast_pm  * proj_min
+        proj_stl  = stl_pm  * proj_min
+        proj_blk  = blk_pm  * proj_min
+        proj_tov  = tov_pm  * proj_min
+        proj_fg3m = fg3m_pm * proj_min
+
+        # User direct overrides on stats
+        pts_overridden = False
+        if "pts_override" in ov and ov["pts_override"] is not None:
+            proj_pts = float(ov["pts_override"])
+            pts_overridden = True
+
+        # Shooting rates for simulator distribution shaping
+        fg_pct  = _nan(ratings.get("FG_PCT_EWM"),  0.46)
+        fg3_pct = _nan(ratings.get("FG3_PCT_EWM"), 0.36)
+        ft_pct  = _nan(ratings.get("FT_PCT_EWM"),  0.77)
+
+        confidence = min(0.40 + 0.012 * gp, 0.90)
+
+        proj = PlayerProjection(
+            player_id=int(_nan(ratings.get("PLAYER_ID"), 0)),
+            player_name=str(ratings.get("PLAYER_NAME", "")),
+            team_abbr=str(ratings.get("TEAM_ABBREVIATION", "")),
+            position=str(ratings.get("POSITION", "UNK")),
+            pos_group=pos,
+            proj_min=max(proj_min, 0.0),
+            proj_pts=max(proj_pts, 0.0),
+            proj_reb=max(proj_reb, 0.0),
+            proj_ast=max(proj_ast, 0.0),
+            proj_stl=max(proj_stl, 0.0),
+            proj_blk=max(proj_blk, 0.0),
+            proj_tov=max(proj_tov, 0.0),
+            proj_fg3m=max(proj_fg3m, 0.0),
+            fg_pct=float(np.clip(fg_pct, 0.25, 0.75)),
+            fg3_pct=float(np.clip(fg3_pct, 0.15, 0.65)),
+            ft_pct=float(np.clip(ft_pct, 0.40, 1.00)),
+            active=bool(ov.get("active", True)),
+            injury_rating=injury,
+            minutes_override=float(ov["minutes_override"]) if "minutes_override" in ov else None,
+            games_played=gp,
+            confidence=confidence,
+            _pts_overridden=pts_overridden,
+            _min_overridden=min_overridden,
+        )
+        # Derived combos
+        proj.proj_pra = proj.proj_pts + proj.proj_reb + proj.proj_ast
+        proj.proj_pr  = proj.proj_pts + proj.proj_reb
+        proj.proj_pa  = proj.proj_pts + proj.proj_ast
+        proj.proj_ra  = proj.proj_reb + proj.proj_ast
+        return proj
+
+    def project_roster(
+        self,
+        team_abbr: str,
+        team_proj: TeamProjection,
+        overrides: Optional[Dict[int, Dict]] = None,
+        season: Optional[str] = None,
+    ) -> List[PlayerProjection]:
+        """Project all players for a team and normalize totals to team projection."""
+        overrides = overrides or {}
+        roster_ratings = self.get_team_roster(team_abbr, season)
+        if not roster_ratings:
+            return []
+
+        projections = []
+        for r in roster_ratings:
+            pid = int(_nan(r.get("PLAYER_ID"), 0))
+            ov = overrides.get(pid, {})
+            proj = self.project_player(r, team_proj, ov)
+            proj.active = bool(ov.get("active", True))
+            if not proj.active or proj.injury_rating >= 1.0:
+                proj.active = False
+                proj = self._zero(proj)
+            projections.append(proj)
+
+        return self._reconcile(projections, team_proj)
+
+    def _zero(self, p: PlayerProjection) -> PlayerProjection:
+        for attr in ["proj_min", "proj_pts", "proj_reb", "proj_ast",
+                     "proj_stl", "proj_blk", "proj_tov", "proj_fg3m",
+                     "proj_pra", "proj_pr", "proj_pa", "proj_ra"]:
+            setattr(p, attr, 0.0)
+        return p
+
+    def _reconcile(self, projs: List[PlayerProjection],
+                   tp: TeamProjection) -> List[PlayerProjection]:
+        """Scale active player projections so totals match team projection."""
+        active = [p for p in projs if p.active]
+        if not active:
+            return projs
+
+        for stat, team_total in [
+            ("pts",  tp.proj_pts),
+            ("reb",  tp.proj_reb),
+            ("ast",  tp.proj_ast),
+            ("fg3m", tp.proj_fg3m),
+        ]:
+            attr = f"proj_{stat}"
+            overridden = [p for p in active if getattr(p, f"_{stat}_overridden", False)]
+            free       = [p for p in active if not getattr(p, f"_{stat}_overridden", False)]
+            fixed_sum  = sum(getattr(p, attr, 0.0) for p in overridden)
+            free_sum   = sum(getattr(p, attr, 0.0) for p in free)
+            remaining  = max(team_total - fixed_sum, 0.0)
+            if free_sum > 0 and remaining > 0:
+                scale = remaining / free_sum
+                for p in free:
+                    setattr(p, attr, max(getattr(p, attr, 0.0) * scale, 0.0))
+            elif free_sum > 0 and remaining == 0:
+                for p in free:
+                    setattr(p, attr, 0.0)
+
+        # Recompute combos after reconcile
+        for p in active:
+            p.proj_pra = p.proj_pts + p.proj_reb + p.proj_ast
+            p.proj_pr  = p.proj_pts + p.proj_reb
+            p.proj_pa  = p.proj_pts + p.proj_ast
+            p.proj_ra  = p.proj_reb + p.proj_ast
+
+        return projs
+
+
+# ---------------------------------------------------------------------------
+# Class 4: NBASimulator
+# ---------------------------------------------------------------------------
+
+class NBASimulator:
+    """
+    Monte Carlo simulation for NBA game and player outcomes.
+
+    Team totals: Normal(mu, sigma) truncated at 0
+    Player stats: NegBin with correlation structure between teammates
+    """
+
+    def __init__(self, n_sims: int = N_SIMS, seed: int = 42):
+        self.n_sims = n_sims
+        self.seed   = seed
+
+    def simulate_game(self, home: TeamProjection, away: TeamProjection) -> GameSimulation:
+        rng = np.random.default_rng(self.seed)
+        n = self.n_sims
+
+        # Team scoring: Normal with empirical sigma (~12 pts/team)
+        sigma = 12.0
+        home_pts = np.maximum(rng.normal(home.proj_pts, sigma, n), 70)
+        away_pts = np.maximum(rng.normal(away.proj_pts, sigma, n), 70)
+
+        home_wins = home_pts > away_pts
+        # OT breaks ties
+        tied = home_pts == away_pts
+        home_wins = home_wins | (tied & (rng.random(n) < 0.5))
+        away_wins = ~home_wins
+
+        home_win_prob = float(np.mean(home_wins))
+        away_win_prob = 1.0 - home_win_prob
+
+        # Quality model blend if both teams have decent data
+        q_diff = home.proj_pts - away.proj_pts
+        # Logistic: 3-pt edge ≈ 55%
+        q_home = float(1.0 / (1.0 + np.exp(-q_diff / 8.0)))
+        blend_w = 0.65  # simulation weight
+        home_win_prob = blend_w * home_win_prob + (1.0 - blend_w) * q_home
+        away_win_prob = 1.0 - home_win_prob
+
+        total = home_pts + away_pts
+        spread = home_pts - away_pts
+
+        return GameSimulation(
+            n_sims=n,
+            home_pts=home_pts,
+            away_pts=away_pts,
+            home_win_prob=home_win_prob,
+            away_win_prob=away_win_prob,
+            spread_home=float(np.median(spread)),
+            expected_total=float(np.median(total)),
+            total_distribution=total,
+            margin_distribution=spread,
+        )
+
+    def _negbinom_params(self, mu: float, var_ratio: float = 1.5) -> Tuple[int, float]:
+        """Return (n, p) for NegBin with mean=mu and var=mu*var_ratio."""
+        mu = max(mu, 0.01)
+        var = mu * var_ratio
+        p = mu / var
+        n = max(int(round(mu * p / (1 - p))), 1)
+        return n, float(p)
+
+    def simulate_players(
+        self,
+        player_projs: List[PlayerProjection],
+        team_pts_draws: np.ndarray,
+        team_proj_pts: float,
+    ) -> List[PlayerSimulation]:
+        rng = np.random.default_rng(self.seed + 1)
+        n = self.n_sims
+        active = [p for p in player_projs if p.active]
+        results = []
+
+        # Draw raw stats for each player
+        raw: Dict[int, Dict[str, np.ndarray]] = {}
+        for p in active:
+            pid = p.player_id
+            draws: Dict[str, np.ndarray] = {}
+
+            # Minutes: Normal
+            min_sigma = max(p.proj_min * 0.20, 2.0)
+            min_draws = np.clip(rng.normal(p.proj_min, min_sigma, n), 0, 48)
+            draws["MIN"] = min_draws
+
+            # PTS: NegBin (var/mean ~1.4 for NBA scoring)
+            nb_n, nb_p = self._negbinom_params(max(p.proj_pts, 0.01), 1.4)
+            draws["PTS"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+
+            # REB: NegBin (var/mean ~1.3)
+            nb_n, nb_p = self._negbinom_params(max(p.proj_reb, 0.01), 1.3)
+            draws["REB"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+
+            # AST: NegBin (var/mean ~1.5)
+            nb_n, nb_p = self._negbinom_params(max(p.proj_ast, 0.01), 1.5)
+            draws["AST"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+
+            # STL: Poisson-like (var/mean ~1.1)
+            draws["STL"] = rng.poisson(max(p.proj_stl, 0.01), n).astype(float)
+
+            # BLK: Poisson-like
+            draws["BLK"] = rng.poisson(max(p.proj_blk, 0.01), n).astype(float)
+
+            # TOV: NegBin
+            nb_n, nb_p = self._negbinom_params(max(p.proj_tov, 0.01), 1.2)
+            draws["TOV"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+
+            # FG3M: Binomial(attempts, fg3_pct)
+            # Estimate 3PA from rate and minutes
+            fg3a_per_min = p.proj_fg3m / max(p.proj_min, 1.0) / p.fg3_pct if p.fg3_pct > 0 else 0.0
+            fg3a_draws = np.clip(rng.poisson(max(fg3a_per_min * min_draws.mean(), 0.01), n), 0, 20)
+            draws["FG3M"] = rng.binomial(fg3a_draws.astype(int), p.fg3_pct, n).astype(float)
+
+            raw[pid] = draws
+
+        # Condition PTS on team draw (same approach as PLL)
+        pts_field = {p.player_id: raw[p.player_id]["PTS"] for p in active}
+        sum_raw = sum(pts_field.values())
+        sum_raw_arr = sum_raw if isinstance(sum_raw, np.ndarray) else np.full(n, sum_raw)
+        sum_raw_arr = np.maximum(sum_raw_arr, 0.01)
+        team_draw = np.round(team_pts_draws).clip(min=0)
+        scale = team_draw / sum_raw_arr
+        for p in active:
+            raw[p.player_id]["PTS"] = np.round(raw[p.player_id]["PTS"] * scale).clip(min=0)
+
+        # Build combo distributions
+        for p in active:
+            pid = p.player_id
+            d = raw[pid]
+            d["PRA"] = d["PTS"] + d["REB"] + d["AST"]
+            d["PR"]  = d["PTS"] + d["REB"]
+            d["PA"]  = d["PTS"] + d["AST"]
+            d["RA"]  = d["REB"] + d["AST"]
+
+            proj_vals = {k: float(np.mean(v)) for k, v in d.items()}
+            prop_lines = {k: _nearest_half(float(np.median(v))) for k, v in d.items()}
+
+            results.append(PlayerSimulation(
+                player_id=pid,
+                player_name=p.player_name,
+                stat_distributions=d,
+                proj_values=proj_vals,
+                prop_lines=prop_lines,
+            ))
+
+        return results
+
+
+# ---------------------------------------------------------------------------
+# Class 5: NBAPricingEngine
+# ---------------------------------------------------------------------------
+
+class NBAPricingEngine:
+    """Convert simulation distributions to prop lines and fair odds."""
+
+    PROP_STATS = ["PTS", "REB", "AST", "FG3M", "STL", "BLK", "TOV",
+                  "PRA", "PR", "PA", "RA", "MIN"]
+
+    def __init__(self, hold_pct: float = 0.05):
+        self.hold_pct = hold_pct
+
+    def price_prop(self, sim: PlayerSimulation, stat: str,
+                   line: Optional[float] = None) -> Dict:
+        if stat not in sim.stat_distributions:
+            return {}
+        dist = sim.stat_distributions[stat]
+        proj = sim.proj_values.get(stat, float(np.mean(dist)))
+        if line is None:
+            line = _nearest_half(float(np.median(dist)))
+
+        fair_over = float(np.mean(dist > line))
+        fair_under = 1.0 - fair_over
+
+        return {
+            "stat":       stat,
+            "projection": round(proj, 3),
+            "line":       line,
+            "fair_over":  round(fair_over, 4),
+            "fair_under": round(fair_under, 4),
+            "over_odds":  _prob_to_american(fair_over,  self.hold_pct),
+            "under_odds": _prob_to_american(fair_under, self.hold_pct),
+            "p10":  round(float(np.percentile(dist, 10)), 1),
+            "p25":  round(float(np.percentile(dist, 25)), 1),
+            "p50":  round(float(np.percentile(dist, 50)), 1),
+            "p75":  round(float(np.percentile(dist, 75)), 1),
+            "p90":  round(float(np.percentile(dist, 90)), 1),
+        }
+
+    def price_game(self, game_sim: GameSimulation) -> GameMarket:
+        h = game_sim.home_win_prob
+        a = game_sim.away_win_prob
+        spread = game_sim.spread_home
+        total  = game_sim.expected_total
+
+        total_line = _nearest_half(total)
+        fair_over  = float(np.mean(game_sim.total_distribution > total_line))
+
+        # Spread line to nearest 0.5
+        spread_line = _nearest_half(spread)
+
+        return GameMarket(
+            home_ml=_prob_to_american(h, self.hold_pct),
+            away_ml=_prob_to_american(a, self.hold_pct),
+            home_win_prob=round(h, 4),
+            away_win_prob=round(a, 4),
+            spread_home=round(spread_line, 1),
+            spread_home_odds=_prob_to_american(0.52, self.hold_pct),
+            spread_away_odds=_prob_to_american(0.52, self.hold_pct),
+            total_line=total_line,
+            over_odds=_prob_to_american(fair_over, self.hold_pct),
+            under_odds=_prob_to_american(1.0 - fair_over, self.hold_pct),
+        )
+
+    def price_all_players(
+        self, sims: List[PlayerSimulation]
+    ) -> Dict[int, Dict[str, Dict]]:
+        markets = {}
+        for sim in sims:
+            markets[sim.player_id] = {
+                stat: self.price_prop(sim, stat)
+                for stat in self.PROP_STATS
+                if stat in sim.stat_distributions
+            }
+        return markets
+
+
+# ---------------------------------------------------------------------------
+# Class 6: NBAProjectionEngine (orchestrator)
+# ---------------------------------------------------------------------------
+
+class NBAProjectionEngine:
+    """
+    Top-level orchestrator. Call load() then fit() once per session,
+    then project() for each game.
+    """
+
+    def __init__(self, db_path: Optional[str] = None):
+        _default = str(Path(__file__).resolve().parent /
+                       "data" / "analytics_database" / "nba_warehouse.duckdb")
+        self.db_path = db_path or os.getenv("NBA_DB_PATH", _default)
+
+        self.loader       = NBADataLoader(self.db_path)
+        self.team_model   = NBATeamModel()
+        self.player_model: Optional[NBAPlayerModel] = None
+        self.simulator    = NBASimulator(n_sims=N_SIMS, seed=42)
+        self.pricing      = NBAPricingEngine(hold_pct=0.05)
+
+        self.player_games: pd.DataFrame = pd.DataFrame()
+        self.team_games:   pd.DataFrame = pd.DataFrame()
+        self.schedule:     pd.DataFrame = pd.DataFrame()
+        self.player_info:  pd.DataFrame = pd.DataFrame()
+
+        self._loaded = False
+        self._fitted = False
+
+    def load(self) -> None:
+        logger.info("Loading NBA warehouse: %s", self.db_path)
+        self.team_games   = self.loader.load_team_games()
+        self.player_games = self.loader.load_player_games()
+        self.schedule     = self.loader.load_schedule()
+        self.player_info  = self.loader.load_player_info()
+        self._loaded = True
+        logger.info("Loaded: %d team rows, %d player rows, %d schedule rows",
+                    len(self.team_games), len(self.player_games), len(self.schedule))
+
+    def fit(self) -> None:
+        if not self._loaded:
+            self.load()
+        logger.info("Fitting models...")
+        self.team_model.fit(self.team_games)
+        self.player_model = NBAPlayerModel(self.player_games, self.player_info)
+        self._fitted = True
+        logger.info("Models fitted.")
+
+    def get_team_rating(self, team_abbr: str,
+                        as_of_date: Optional[str] = None) -> Dict:
+        """Return latest rating dict for a team."""
+        if self.team_games.empty:
+            return {}
+        mask = self.team_games["TEAM_ABBREVIATION"].astype(str).str.upper() == team_abbr.upper()
+        if as_of_date and "GAME_DATE" in self.team_games.columns:
+            dates = pd.to_datetime(self.team_games["GAME_DATE"], errors="coerce")
+            cutoff = pd.to_datetime(as_of_date, errors="coerce")
+            if pd.notna(cutoff):
+                mask &= dates < cutoff
+        sub = self.team_games[mask]
+        if sub.empty:
+            return {}
+        if "GAME_DATE" in sub.columns:
+            sub = sub.sort_values("GAME_DATE")
+        return sub.iloc[-1].to_dict()
+
+    def upcoming_games(self) -> List[Dict]:
+        if self.schedule.empty:
+            return []
+        return self.schedule.to_dict("records")
+
+    def project(
+        self,
+        home_team_abbr: str,
+        away_team_abbr: str,
+        game_date: Optional[str] = None,
+        player_overrides: Optional[Dict[int, Dict]] = None,
+        current_season: str = "2025-26",
+    ) -> ProjectionResult:
+        if not self._fitted:
+            self.fit()
+
+        hf = self.get_team_rating(home_team_abbr, game_date)
+        af = self.get_team_rating(away_team_abbr, game_date)
+
+        h_proj = self.team_model.predict(hf, af)
+        a_proj = self.team_model.predict(af, hf)
+
+        # Set team names from ratings
+        h_proj.team_abbr = home_team_abbr
+        a_proj.team_abbr = away_team_abbr
+        h_proj.opp_team_abbr = away_team_abbr
+        a_proj.opp_team_abbr = home_team_abbr
+
+        # Win probability update after both projections known
+        pt_diff = h_proj.proj_pts - a_proj.proj_pts
+        q_home = float(1.0 / (1.0 + np.exp(-pt_diff / 8.0)))
+        h_proj.proj_win_prob = q_home
+        a_proj.proj_win_prob = 1.0 - q_home
+
+        ov = player_overrides or {}
+
+        def _team_ov(abbr: str) -> Dict[int, Dict]:
+            if not self.player_model or self.player_games.empty:
+                return {}
+            team_pids = set(
+                self.player_games[
+                    self.player_games["TEAM_ABBREVIATION"].astype(str).str.upper() == abbr.upper()
+                ]["PLAYER_ID"].dropna().astype(int).tolist()
+            )
+            return {pid: v for pid, v in ov.items() if pid in team_pids}
+
+        h_players = (self.player_model.project_roster(
+            home_team_abbr, h_proj, _team_ov(home_team_abbr), current_season)
+            if self.player_model else [])
+        a_players = (self.player_model.project_roster(
+            away_team_abbr, a_proj, _team_ov(away_team_abbr), current_season)
+            if self.player_model else [])
+
+        game_sim = self.simulator.simulate_game(h_proj, a_proj)
+
+        h_psims = self.simulator.simulate_players(
+            h_players, game_sim.home_pts, h_proj.proj_pts)
+        a_psims = self.simulator.simulate_players(
+            a_players, game_sim.away_pts, a_proj.proj_pts)
+
+        game_market = self.pricing.price_game(game_sim)
+        player_markets = self.pricing.price_all_players(h_psims + a_psims)
+
+        import datetime as _dt
+        return ProjectionResult(
+            game_id=f"{away_team_abbr}@{home_team_abbr}_{game_date or 'today'}",
+            home_team=home_team_abbr,
+            away_team=away_team_abbr,
+            home_proj=h_proj,
+            away_proj=a_proj,
+            home_players=h_players,
+            away_players=a_players,
+            game_sim=game_sim,
+            home_player_sims=h_psims,
+            away_player_sims=a_psims,
+            game_market=game_market,
+            player_markets=player_markets,
+            generated_at=_dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        )
