@@ -82,21 +82,57 @@ SEASON_TYPE = "Regular Season"
 
 TIMEOUT_KEYWORDS = ("Read timed out", "ReadTimeout", "Max retries", "HTTPSConnectionPool")
 
+# ── NBA API header injection ──────────────────────────────────────────────────
+# stats.nba.com blocks requests that don't look like a real browser.
+# This is especially true from GitHub Actions / CI environments.
+# Injecting standard browser headers at the session level fixes this.
+try:
+    from nba_api.library.http import NBAStatsHTTP
+    _orig_send = NBAStatsHTTP.send_api_request
+
+    def _patched_send(self, endpoint, parameters, referer=None, proxy=None):
+        self.headers.update({
+            "Host":             "stats.nba.com",
+            "User-Agent":       ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                 "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                 "Chrome/136.0.0.0 Safari/537.36"),
+            "Accept":           "application/json, text/plain, */*",
+            "Accept-Language":  "en-US,en;q=0.9",
+            "Accept-Encoding":  "gzip, deflate, br",
+            "x-nba-stats-origin": "stats",
+            "x-nba-stats-token":  "true",
+            "Origin":           "https://www.nba.com",
+            "Referer":          "https://www.nba.com/",
+            "Connection":       "keep-alive",
+        })
+        return _orig_send(self, endpoint, parameters, referer=referer, proxy=proxy)
+
+    NBAStatsHTTP.send_api_request = _patched_send
+    logger.info("NBA API headers patched for server environment")
+except Exception as _e:
+    logger.debug("Header patch skipped (nba_api version may differ): %s", _e)
+
+
 # ── API helpers ───────────────────────────────────────────────────────────────
 
-def safe_api_call(api_cls, max_retries=5, base_sleep=3.0, **kwargs):
-    """nba_api wrapper with exponential backoff."""
+def safe_api_call(api_cls, max_retries=8, base_sleep=5.0, **kwargs):
+    """
+    nba_api wrapper with exponential backoff and jitter.
+    Increased retries and base sleep for CI environments where
+    stats.nba.com rate-limits more aggressively.
+    """
     for attempt in range(1, max_retries + 1):
         try:
             resp = api_cls(**kwargs)
-            time.sleep(random.uniform(0.6, 1.2))
+            time.sleep(random.uniform(1.0, 2.0))  # polite delay between calls
             return resp
         except Exception as e:
             msg = str(e)
-            sleep_s = base_sleep * (2 ** (attempt - 1)) + random.uniform(0, 1.5)
+            sleep_s = base_sleep * (2 ** min(attempt - 1, 4)) + random.uniform(0, 3.0)
             if any(k in msg for k in TIMEOUT_KEYWORDS):
-                sleep_s = max(sleep_s, 15.0)
-            logger.warning("API attempt %d/%d failed (%s). Sleeping %.1fs", attempt, max_retries, msg[:60], sleep_s)
+                sleep_s = max(sleep_s, 20.0)
+            logger.warning("API attempt %d/%d failed (%s). Sleeping %.1fs",
+                           attempt, max_retries, msg[:80], sleep_s)
             time.sleep(sleep_s)
     logger.error("Max retries reached for %s", api_cls.__name__)
     return None
@@ -109,11 +145,13 @@ def fetch_player_logs(seasons: List[str]) -> pd.DataFrame:
     frames = []
     for season in seasons:
         logger.info("Fetching player logs: %s", season)
+        # Extra sleep before each season to avoid rate limiting in CI
+        time.sleep(random.uniform(2.0, 4.0))
         resp = safe_api_call(leaguegamelog.LeagueGameLog,
                              season=season,
                              season_type_all_star=SEASON_TYPE,
                              player_or_team_abbreviation="P",
-                             timeout=60)
+                             timeout=120)
         if resp is None:
             logger.warning("Skipping player logs for %s", season)
             continue
@@ -130,11 +168,12 @@ def fetch_team_logs(seasons: List[str]) -> pd.DataFrame:
     frames = []
     for season in seasons:
         logger.info("Fetching team logs: %s", season)
+        time.sleep(random.uniform(2.0, 4.0))
         resp = safe_api_call(leaguegamelog.LeagueGameLog,
                              season=season,
                              season_type_all_star=SEASON_TYPE,
                              player_or_team_abbreviation="T",
-                             timeout=60)
+                             timeout=120)
         if resp is None:
             logger.warning("Skipping team logs for %s", season)
             continue
