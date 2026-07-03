@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install nba_api pandas numpy pyarrow duckdb scikit-learn requests tenacity
+          pip install nba_api pandas numpy pyarrow duckdb scikit-learn requests tenacity curl_cffi
 
       # ── 4. Restore cached raw data (avoids re-scraping unchanged seasons) ───
       - name: Restore raw data cache

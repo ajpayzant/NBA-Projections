@@ -82,49 +82,82 @@ SEASON_TYPE = "Regular Season"
 
 TIMEOUT_KEYWORDS = ("Read timed out", "ReadTimeout", "Max retries", "HTTPSConnectionPool")
 
-# ── NBA API header injection ──────────────────────────────────────────────────
-# stats.nba.com blocks requests that don't look like a real browser.
-# This is especially true from GitHub Actions / CI environments.
-# Injecting standard browser headers at the session level fixes this.
+# ── Direct HTTP client using curl_cffi (real browser TLS fingerprint) ────────
+# stats.nba.com uses TLS fingerprint detection — it blocks Python's urllib3
+# regardless of headers because the TLS handshake looks like a bot.
+# curl_cffi uses libcurl with Chrome's actual TLS fingerprint, bypassing this.
+
 try:
-    from nba_api.library.http import NBAStatsHTTP
-    _orig_send = NBAStatsHTTP.send_api_request
+    from curl_cffi import requests as _cffi_requests
+    _USE_CFFI = True
+    logger.info("curl_cffi available — using Chrome TLS fingerprint for NBA API")
+except ImportError:
+    import requests as _cffi_requests  # fallback, may fail in CI
+    _USE_CFFI = False
+    logger.warning("curl_cffi not available — falling back to requests (may be blocked by stats.nba.com)")
 
-    def _patched_send(self, endpoint, parameters, referer=None, proxy=None):
-        self.headers.update({
-            "Host":             "stats.nba.com",
-            "User-Agent":       ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                 "Chrome/136.0.0.0 Safari/537.36"),
-            "Accept":           "application/json, text/plain, */*",
-            "Accept-Language":  "en-US,en;q=0.9",
-            "Accept-Encoding":  "gzip, deflate, br",
-            "x-nba-stats-origin": "stats",
-            "x-nba-stats-token":  "true",
-            "Origin":           "https://www.nba.com",
-            "Referer":          "https://www.nba.com/",
-            "Connection":       "keep-alive",
-        })
-        return _orig_send(self, endpoint, parameters, referer=referer, proxy=proxy)
+_NBA_HEADERS = {
+    "x-nba-stats-origin": "stats",
+    "x-nba-stats-token":  "true",
+    "Origin":             "https://www.nba.com",
+    "Referer":            "https://www.nba.com/",
+    "Accept":             "application/json, text/plain, */*",
+    "Accept-Language":    "en-US,en;q=0.9",
+}
 
-    NBAStatsHTTP.send_api_request = _patched_send
-    logger.info("NBA API headers patched for server environment")
-except Exception as _e:
-    logger.debug("Header patch skipped (nba_api version may differ): %s", _e)
+_NBA_BASE = "https://stats.nba.com/stats"
 
 
-# ── API helpers ───────────────────────────────────────────────────────────────
+def _fetch_stats_json(endpoint: str, params: Dict,
+                      max_retries: int = 8,
+                      base_sleep: float = 5.0) -> Optional[Dict]:
+    """
+    Fetch a stats.nba.com endpoint using curl_cffi with Chrome TLS fingerprint.
+    Falls back to regular requests if curl_cffi is unavailable.
+    """
+    url = f"{_NBA_BASE}/{endpoint}"
+    for attempt in range(1, max_retries + 1):
+        try:
+            if _USE_CFFI:
+                resp = _cffi_requests.get(url, headers=_NBA_HEADERS, params=params,
+                                          impersonate="chrome136", timeout=60)
+            else:
+                resp = _cffi_requests.get(url, headers=_NBA_HEADERS, params=params,
+                                          timeout=60)
+            resp.raise_for_status()
+            time.sleep(random.uniform(1.0, 2.5))
+            return resp.json()
+        except Exception as e:
+            msg = str(e)
+            sleep_s = base_sleep * (2 ** min(attempt - 1, 4)) + random.uniform(0, 3.0)
+            if any(k in msg for k in TIMEOUT_KEYWORDS):
+                sleep_s = max(sleep_s, 20.0)
+            logger.warning("HTTP attempt %d/%d for %s: %s — sleeping %.1fs",
+                           attempt, max_retries, endpoint, msg[:80], sleep_s)
+            time.sleep(sleep_s)
+    logger.error("Max retries reached for endpoint: %s", endpoint)
+    return None
+
+
+def _json_to_df(data: Dict, result_set_idx: int = 0) -> pd.DataFrame:
+    """Convert stats.nba.com JSON response to a DataFrame."""
+    try:
+        rs = data["resultSets"][result_set_idx]
+        return pd.DataFrame(rs["rowSet"], columns=rs["headers"])
+    except Exception as e:
+        logger.warning("Failed to parse JSON response: %s", e)
+        return pd.DataFrame()
+
 
 def safe_api_call(api_cls, max_retries=8, base_sleep=5.0, **kwargs):
     """
-    nba_api wrapper with exponential backoff and jitter.
-    Increased retries and base sleep for CI environments where
-    stats.nba.com rate-limits more aggressively.
+    nba_api wrapper — kept for CommonPlayerInfo and ScoreboardV2
+    which we still call via nba_api (lower volume, less affected by blocking).
     """
     for attempt in range(1, max_retries + 1):
         try:
             resp = api_cls(**kwargs)
-            time.sleep(random.uniform(1.0, 2.0))  # polite delay between calls
+            time.sleep(random.uniform(1.0, 2.0))
             return resp
         except Exception as e:
             msg = str(e)
@@ -138,48 +171,67 @@ def safe_api_call(api_cls, max_retries=8, base_sleep=5.0, **kwargs):
     return None
 
 
-# ── Section 1 & 2: Game logs ─────────────────────────────────────────────────
+# ── Section 1 & 2: Game logs (direct HTTP — bypasses nba_api session) ────────
 
 def fetch_player_logs(seasons: List[str]) -> pd.DataFrame:
-    from nba_api.stats.endpoints import leaguegamelog
+    """Fetch player game logs directly from stats.nba.com."""
     frames = []
     for season in seasons:
         logger.info("Fetching player logs: %s", season)
-        # Extra sleep before each season to avoid rate limiting in CI
         time.sleep(random.uniform(2.0, 4.0))
-        resp = safe_api_call(leaguegamelog.LeagueGameLog,
-                             season=season,
-                             season_type_all_star=SEASON_TYPE,
-                             player_or_team_abbreviation="P",
-                             timeout=120)
-        if resp is None:
+        data = _fetch_stats_json("leaguegamelog", {
+            "Season":            season,
+            "SeasonType":        SEASON_TYPE,
+            "PlayerOrTeam":      "P",
+            "Direction":         "ASC",
+            "Sorter":            "DATE",
+            "LeagueID":          "00",
+            "Counter":           "0",
+            "DateFrom":          "",
+            "DateTo":            "",
+        })
+        if data is None:
             logger.warning("Skipping player logs for %s", season)
             continue
-        df = resp.get_data_frames()[0]
+        df = _json_to_df(data)
+        if df.empty:
+            logger.warning("Empty player logs for %s", season)
+            continue
         df["SEASON"] = season
         frames.append(df)
+        logger.info("  Got %d player-game rows for %s", len(df), season)
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
 
 
 def fetch_team_logs(seasons: List[str]) -> pd.DataFrame:
-    from nba_api.stats.endpoints import leaguegamelog
+    """Fetch team game logs directly from stats.nba.com."""
     frames = []
     for season in seasons:
         logger.info("Fetching team logs: %s", season)
         time.sleep(random.uniform(2.0, 4.0))
-        resp = safe_api_call(leaguegamelog.LeagueGameLog,
-                             season=season,
-                             season_type_all_star=SEASON_TYPE,
-                             player_or_team_abbreviation="T",
-                             timeout=120)
-        if resp is None:
+        data = _fetch_stats_json("leaguegamelog", {
+            "Season":            season,
+            "SeasonType":        SEASON_TYPE,
+            "PlayerOrTeam":      "T",
+            "Direction":         "ASC",
+            "Sorter":            "DATE",
+            "LeagueID":          "00",
+            "Counter":           "0",
+            "DateFrom":          "",
+            "DateTo":            "",
+        })
+        if data is None:
             logger.warning("Skipping team logs for %s", season)
             continue
-        df = resp.get_data_frames()[0]
+        df = _json_to_df(data)
+        if df.empty:
+            logger.warning("Empty team logs for %s", season)
+            continue
         df["SEASON"] = season
         frames.append(df)
+        logger.info("  Got %d team-game rows for %s", len(df), season)
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
