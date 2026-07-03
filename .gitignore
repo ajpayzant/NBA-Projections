@@ -10,8 +10,9 @@ data/analytics_database/*.duckdb
 data/analytics_database/*.duckdb-wal
 data/analytics_database/*.duckdb-shm
 
-# Raw API cache
-data/raw_cache/
+# Raw API cache — parquet files ARE committed (used by CI to avoid full rescrape)
+# Only exclude large or sensitive files
+data/raw_cache/*.log
 
 # Session / projection output
 data/session_autosave.json

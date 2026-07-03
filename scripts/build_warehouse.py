@@ -688,6 +688,48 @@ def load_to_duckdb(player_features: pd.DataFrame,
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
+def _fetch_recent_games(season: str, days_back: int = 30) -> tuple:
+    """
+    Fetch only the most recent games for a season (last N days).
+    Uses DateFrom/DateTo to minimize API calls and reduce blocking risk.
+    Returns (player_df, team_df).
+    """
+    date_from = (dt.date.today() - dt.timedelta(days=days_back)).strftime("%m/%d/%Y")
+    date_to   = dt.date.today().strftime("%m/%d/%Y")
+    logger.info("Fetching recent games %s → %s for %s", date_from, date_to, season)
+
+    p_data = _fetch_stats_json("leaguegamelog", {
+        "Season":       season,
+        "SeasonType":   SEASON_TYPE,
+        "PlayerOrTeam": "P",
+        "Direction":    "DESC",
+        "Sorter":       "DATE",
+        "LeagueID":     "00",
+        "Counter":      "0",
+        "DateFrom":     date_from,
+        "DateTo":       date_to,
+    })
+    t_data = _fetch_stats_json("leaguegamelog", {
+        "Season":       season,
+        "SeasonType":   SEASON_TYPE,
+        "PlayerOrTeam": "T",
+        "Direction":    "DESC",
+        "Sorter":       "DATE",
+        "LeagueID":     "00",
+        "Counter":      "0",
+        "DateFrom":     date_from,
+        "DateTo":       date_to,
+    })
+
+    p_df = _json_to_df(p_data) if p_data else pd.DataFrame()
+    t_df = _json_to_df(t_data) if t_data else pd.DataFrame()
+    if not p_df.empty:
+        p_df["SEASON"] = season
+    if not t_df.empty:
+        t_df["SEASON"] = season
+    return p_df, t_df
+
+
 def main(full_rebuild: bool = False):
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     REF_DIR.mkdir(parents=True, exist_ok=True)
@@ -702,21 +744,52 @@ def main(full_rebuild: bool = False):
         player_raw = pd.read_parquet(player_raw_path)
         team_raw   = pd.read_parquet(team_raw_path)
 
-        # Incremental: only fetch current season if data exists
         existing_seasons = set(player_raw["SEASON"].unique()) if "SEASON" in player_raw.columns else set()
+
+        # Fetch any completely missing seasons (new season start)
         missing = [s for s in SEASONS if s not in existing_seasons]
         if missing:
-            logger.info("Fetching missing seasons: %s", missing)
+            logger.info("Fetching new seasons from scratch: %s", missing)
             new_p = fetch_player_logs(missing)
             new_t = fetch_team_logs(missing)
             if not new_p.empty:
-                player_raw = pd.concat([player_raw, new_p], ignore_index=True).drop_duplicates("GAME_ID" if "GAME_ID" in player_raw.columns else player_raw.columns[0])
+                player_raw = pd.concat([player_raw, new_p], ignore_index=True)
             if not new_t.empty:
                 team_raw = pd.concat([team_raw, new_t], ignore_index=True)
+
+        # Incremental update: fetch only recent games for the current season.
+        # This is the daily CI path — just 2 API calls instead of 10.
+        logger.info("Incremental update: fetching recent games for %s", CURRENT_SEASON)
+        new_p, new_t = _fetch_recent_games(CURRENT_SEASON, days_back=7)
+        if not new_p.empty:
+            logger.info("  Got %d new player rows", len(new_p))
+            if "GAME_ID" in player_raw.columns and "GAME_ID" in new_p.columns:
+                existing_ids = set(player_raw["GAME_ID"].astype(str))
+                new_p = new_p[~new_p["GAME_ID"].astype(str).isin(existing_ids)]
+            if not new_p.empty:
+                player_raw = pd.concat([player_raw, new_p], ignore_index=True)
+        if not new_t.empty:
+            logger.info("  Got %d new team rows", len(new_t))
+            if "GAME_ID" in team_raw.columns and "GAME_ID" in new_t.columns:
+                existing_ids = set(team_raw["GAME_ID"].astype(str))
+                new_t = new_t[~new_t["GAME_ID"].astype(str).isin(existing_ids)]
+            if not new_t.empty:
+                team_raw = pd.concat([team_raw, new_t], ignore_index=True)
+
     else:
-        logger.info("Full scrape of all seasons...")
-        player_raw = fetch_player_logs(SEASONS)
-        team_raw   = fetch_team_logs(SEASONS)
+        # No cache — full scrape. Fetch all seasons one at a time with delay.
+        logger.info("No cache found. Full scrape of all seasons (this takes ~10 minutes)...")
+        player_frames, team_frames = [], []
+        for season in SEASONS:
+            time.sleep(random.uniform(3.0, 6.0))  # polite delay between seasons
+            p = fetch_player_logs([season])
+            t = fetch_team_logs([season])
+            if not p.empty:
+                player_frames.append(p)
+            if not t.empty:
+                team_frames.append(t)
+        player_raw = pd.concat(player_frames, ignore_index=True) if player_frames else pd.DataFrame()
+        team_raw   = pd.concat(team_frames,   ignore_index=True) if team_frames   else pd.DataFrame()
 
     # Standardize GAME_ID
     for df in [player_raw, team_raw]:

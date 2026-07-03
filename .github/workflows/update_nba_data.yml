@@ -43,16 +43,7 @@ jobs:
           pip install --upgrade pip
           pip install nba_api pandas numpy pyarrow duckdb scikit-learn requests tenacity curl_cffi
 
-      # ── 4. Restore cached raw data (avoids re-scraping unchanged seasons) ───
-      - name: Restore raw data cache
-        uses: actions/cache@v4
-        with:
-          path: data/raw_cache
-          key: nba-raw-cache-${{ runner.os }}-${{ hashFiles('scripts/build_warehouse.py') }}
-          restore-keys: |
-            nba-raw-cache-${{ runner.os }}-
-
-      # ── 5. Run the data pipeline ─────────────────────────────────────────────
+      # ── 4. Run the data pipeline ─────────────────────────────────────────────
       - name: Build / update NBA warehouse
         env:
           FULL_REBUILD: ${{ github.event.inputs.full_rebuild || 'false' }}
@@ -61,8 +52,14 @@ jobs:
             echo "Running FULL rebuild (all seasons)..."
             python scripts/build_warehouse.py --full
           else
-            echo "Running incremental update..."
-            python scripts/build_warehouse.py
+            # Check if parquet cache exists in the repo (committed from local run)
+            if [ -f "data/raw_cache/player_game_logs.parquet" ]; then
+              echo "Parquet cache found — running incremental update (2 API calls)..."
+              python scripts/build_warehouse.py
+            else
+              echo "No parquet cache — running full scrape..."
+              python scripts/build_warehouse.py --full
+            fi
           fi
 
       # ── 6. Commit updated parquet files and DB if changed ───────────────────
