@@ -49,8 +49,35 @@ DB_PATH = _ROOT / "data" / "analytics_database" / "nba_warehouse.duckdb"
 RAW_DIR = _ROOT / "data" / "raw_cache"
 REF_DIR = _ROOT / "data" / "reference_tables"
 
-SEASONS = ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
-CURRENT_SEASON = "2025-26"
+def _current_nba_season() -> str:
+    """
+    Return the current NBA season string (e.g. '2025-26').
+    NBA seasons start in October — if today is Oct or later, we're in
+    the season that started this year; otherwise we're still in last year's.
+    """
+    today = dt.date.today()
+    if today.month >= 10:
+        start_year = today.year
+    else:
+        start_year = today.year - 1
+    return f"{start_year}-{str(start_year + 1)[-2:]}"
+
+
+def _build_season_list(n_back: int = 5) -> List[str]:
+    """Return the last n_back seasons up to and including the current one."""
+    current = _current_nba_season()
+    start_year = int(current.split("-")[0])
+    seasons = []
+    for i in range(n_back - 1, -1, -1):
+        y = start_year - i
+        seasons.append(f"{y}-{str(y + 1)[-2:]}")
+    return seasons
+
+
+CURRENT_SEASON = _current_nba_season()
+SEASONS = _build_season_list(n_back=5)
+
+logger.info("Current NBA season: %s | Seasons to load: %s", CURRENT_SEASON, SEASONS)
 SEASON_TYPE = "Regular Season"
 
 TIMEOUT_KEYWORDS = ("Read timed out", "ReadTimeout", "Max retries", "HTTPSConnectionPool")

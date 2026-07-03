@@ -1,0 +1,92 @@
+name: Update NBA Data Warehouse
+
+on:
+  # Run automatically every day at 6:00 AM UTC (2:00 AM ET / 1:00 AM CT)
+  # This is after most NBA games have finished and stats are posted
+  schedule:
+    - cron: "0 6 * * *"
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      full_rebuild:
+        description: "Full rebuild (rescrape all seasons)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  update-warehouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── 1. Check out the repo ───────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Set up Python ────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Install dependencies ─────────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install nba_api pandas numpy pyarrow duckdb scikit-learn requests tenacity
+
+      # ── 4. Restore cached raw data (avoids re-scraping unchanged seasons) ───
+      - name: Restore raw data cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw_cache
+          key: nba-raw-cache-${{ runner.os }}-${{ hashFiles('scripts/build_warehouse.py') }}
+          restore-keys: |
+            nba-raw-cache-${{ runner.os }}-
+
+      # ── 5. Run the data pipeline ─────────────────────────────────────────────
+      - name: Build / update NBA warehouse
+        env:
+          FULL_REBUILD: ${{ github.event.inputs.full_rebuild || 'false' }}
+        run: |
+          if [ "$FULL_REBUILD" = "true" ]; then
+            echo "Running FULL rebuild (all seasons)..."
+            python scripts/build_warehouse.py --full
+          else
+            echo "Running incremental update..."
+            python scripts/build_warehouse.py
+          fi
+
+      # ── 6. Commit updated parquet files and DB if changed ───────────────────
+      - name: Commit updated warehouse data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage parquet files (raw cache committed for persistence across runs)
+          git add data/raw_cache/*.parquet data/raw_cache/*.json 2>/dev/null || true
+
+          # Only commit if there are actual changes
+          if git diff --staged --quiet; then
+            echo "No data changes detected — skipping commit."
+          else
+            git commit -m "Auto-update NBA data [skip ci]"
+            git push
+          fi
+
+      # ── 7. Notify on failure ─────────────────────────────────────────────────
+      - name: Report status
+        if: always()
+        run: |
+          echo "Workflow status: ${{ job.status }}"
+          if [ "${{ job.status }}" = "failure" ]; then
+            echo "::warning::NBA data update failed. Check the Actions log for details."
+          fi
