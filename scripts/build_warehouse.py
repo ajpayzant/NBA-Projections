@@ -237,12 +237,13 @@ def fetch_team_logs(seasons: List[str]) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-# ── Section 3: Player info / positions ───────────────────────────────────────
+# ── Section 3: Player info / positions (curl_cffi) ───────────────────────────
 
 def fetch_player_info(player_ids: List[int], cache_path: Path) -> pd.DataFrame:
-    """Fetch and cache CommonPlayerInfo for a list of player IDs."""
-    from nba_api.stats.endpoints import commonplayerinfo
-
+    """
+    Fetch and cache player positions via commonplayerinfo endpoint.
+    Uses curl_cffi directly to avoid TLS blocking.
+    """
     cache: Dict[int, dict] = {}
     if cache_path.exists():
         try:
@@ -258,34 +259,93 @@ def fetch_player_info(player_ids: List[int], cache_path: Path) -> pd.DataFrame:
             logger.info("  Player info progress: %d/%d", i, len(missing))
             cache_path.write_text(json.dumps(cache))
 
-        resp = safe_api_call(commonplayerinfo.CommonPlayerInfo, player_id=int(pid), timeout=60)
-        if resp is None:
+        data = _fetch_stats_json("commonplayerinfo", {
+            "PlayerID":  str(pid),
+            "LeagueID":  "00",
+        })
+        if data is None:
             continue
         try:
-            row = resp.get_data_frames()[0].iloc[0]
+            rs = data["resultSets"][0]
+            headers = rs["headers"]
+            row_data = rs["rowSet"]
+            if not row_data:
+                continue
+            row = dict(zip(headers, row_data[0]))
             cache[pid] = {
-                "PLAYER_NAME":    str(row.get("DISPLAY_FIRST_LAST", "")),
-                "POSITION":       str(row.get("POSITION", "UNK")),
-                "HEIGHT":         str(row.get("HEIGHT", "")),
-                "WEIGHT":         str(row.get("WEIGHT", "")),
-                "TEAM_ID":        int(row.get("TEAM_ID", 0)),
+                "PLAYER_NAME":       str(row.get("DISPLAY_FIRST_LAST", "")),
+                "POSITION":          str(row.get("POSITION", "UNK")),
+                "HEIGHT":            str(row.get("HEIGHT", "")),
+                "WEIGHT":            str(row.get("WEIGHT", "")),
+                "TEAM_ID":           int(row.get("TEAM_ID", 0) or 0),
                 "TEAM_ABBREVIATION": str(row.get("TEAM_ABBREVIATION", "")),
             }
         except Exception as e:
             logger.debug("Parse error for player %d: %s", pid, e)
 
     cache_path.write_text(json.dumps(cache))
-
     records = [{"PLAYER_ID": pid, **info} for pid, info in cache.items()]
     return pd.DataFrame(records)
 
 
-# ── Section 4: Schedule ───────────────────────────────────────────────────────
+# ── Section 4: Schedule (curl_cffi) ──────────────────────────────────────────
 
 def fetch_upcoming_games(days_ahead: int = 14) -> pd.DataFrame:
-    """Return upcoming games within the next N days using ScoreboardV2."""
-    from nba_api.stats.endpoints import scoreboardv2
+    """Return upcoming games within the next N days via scoreboard endpoint."""
+    rows = []
+    today = dt.date.today()
+    for delta in range(days_ahead):
+        d = today + dt.timedelta(days=delta)
+        data = _fetch_stats_json("scoreboardv2", {
+            "GameDate":  d.strftime("%Y-%m-%d"),
+            "DayOffset": "0",
+            "LeagueID":  "00",
+        })
+        if data is None:
+            continue
+        try:
+            # GameHeader result set contains game info
+            for rs in data.get("resultSets", []):
+                if rs["name"] != "GameHeader":
+                    continue
+                headers = rs["headers"]
+                for row_data in rs["rowSet"]:
+                    row = dict(zip(headers, row_data))
+                    game_id    = str(row.get("GAME_ID", ""))
+                    home_id    = int(row.get("HOME_TEAM_ID", 0) or 0)
+                    away_id    = int(row.get("VISITOR_TEAM_ID", 0) or 0)
+                    if not game_id or not home_id or not away_id:
+                        continue
+                    # Look up abbreviations from static data
+                    from nba_api.stats.static import teams as _nba_teams
+                    _id_map = {t["id"]: t for t in _nba_teams.get_teams()}
+                    home_info = _id_map.get(home_id, {})
+                    away_info = _id_map.get(away_id, {})
+                    rows.append({
+                        "game_id":        game_id,
+                        "game_date":      d.isoformat(),
+                        "season":         CURRENT_SEASON,
+                        "home_team_id":   home_id,
+                        "away_team_id":   away_id,
+                        "home_team_abbr": home_info.get("abbreviation", ""),
+                        "away_team_abbr": away_info.get("abbreviation", ""),
+                        "home_team_name": home_info.get("full_name", ""),
+                        "away_team_name": away_info.get("full_name", ""),
+                        "status":         str(row.get("GAME_STATUS_TEXT", "Scheduled")),
+                    })
+        except Exception as e:
+            logger.debug("Scoreboard parse error %s: %s", d, e)
+        time.sleep(random.uniform(0.5, 1.0))
 
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows).drop_duplicates("game_id")
+    return df[df["home_team_id"] > 0].sort_values("game_date").reset_index(drop=True)
+
+
+def _fetch_upcoming_games_fallback(days_ahead: int = 14) -> pd.DataFrame:
+    """Fallback using nba_api ScoreboardV2 if direct fetch fails."""
+    from nba_api.stats.endpoints import scoreboardv2
     rows = []
     today = dt.date.today()
     for delta in range(days_ahead):
