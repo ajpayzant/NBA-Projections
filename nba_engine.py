@@ -1047,41 +1047,24 @@ class NBAPlayerModel:
         # so min(natural_sum, team_model) ≈ team_model — no change.
         # When stars are out: natural_sum drops by their contribution, automatically
         # reflecting the weaker lineup without any magic multipliers.
-        # USG redistribution (applied above) partially raises individual rates,
-        # but that inflates _pts_pm not _pts_pm_ewm_orig, so it doesn't affect
-        # the natural_sum anchor — correct, since teammates getting more possessions
-        # doesn't restore the team's total scoring capability.
-        natural_sum = sum(
-            getattr(p, "_pts_pm_ewm_orig", 0.0) * p.proj_min
-            for p in active
-            if p.proj_min > 0
-        )
-        # When the active lineup is weaker than the full-roster baseline, the
-        # possession-based team model overstates team scoring. Cap each stat at
-        # the natural lineup total, preserving the model when at full strength.
-        if tp.proj_pts > 0 and natural_sum < tp.proj_pts:
-            lineup_ratio = natural_sum / tp.proj_pts
-            adj_pts  = natural_sum
-            adj_reb  = tp.proj_reb  * lineup_ratio
-            adj_ast  = tp.proj_ast  * lineup_ratio
-            adj_fg3m = tp.proj_fg3m * lineup_ratio
-            # Update the TeamProjection so the simulator and UI see the corrected total
-            tp.proj_pts  = adj_pts
-            tp.proj_reb  = adj_reb
-            tp.proj_ast  = adj_ast
-            tp.proj_fg3m = adj_fg3m
-        else:
-            adj_pts  = tp.proj_pts
-            adj_reb  = tp.proj_reb
-            adj_ast  = tp.proj_ast
-            adj_fg3m = tp.proj_fg3m
-
         # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
-        # After normalizing minutes, recompute raw stats from rates, then
-        # normalize PTS/REB/AST/FG3M totals to match lineup-adjusted team total.
+        # After normalizing minutes, recompute raw stats from rates × new minutes,
+        # then normalize each stat to the team projection total.
+        #
+        # The team model total (tp.proj_pts) is NOT adjusted based on who is active.
+        # Rationale: the team model is context-aware (opponent defense, pace, home/away,
+        # B2B) and already correctly varies by matchup. With only 5–20 games of data
+        # per player absence scenario, any player-specific adjustment adds more noise
+        # than signal. The measured drop when a star is absent (~7 pts for BOS/Brown)
+        # is largely explained by weaker opponent schedules during those rest games.
+        # What DOES change correctly when a player is deactivated:
+        #   1. Remaining players get more minutes (rotation fill)
+        #   2. Their rates increase via USG redistribution
+        #   3. Those adjusted rates × minutes are distributed to the same team total
+        # The net effect: teammates project higher, which is correct.
+        # Win probability is updated separately after both lineups are resolved.
         for p in active:
             if not p._min_overridden:
-                # Recompute stats from rates × new minutes
                 if hasattr(p, "_pts_pm"):
                     p.proj_pts  = max(p._pts_pm  * p.proj_min, 0.0)
                     p.proj_reb  = max(p._reb_pm  * p.proj_min, 0.0)
@@ -1089,10 +1072,10 @@ class NBAPlayerModel:
                     p.proj_fg3m = max(p._fg3m_pm * p.proj_min, 0.0)
 
         for stat, team_total in [
-            ("pts",  adj_pts),
-            ("reb",  adj_reb),
-            ("ast",  adj_ast),
-            ("fg3m", adj_fg3m),
+            ("pts",  tp.proj_pts),
+            ("reb",  tp.proj_reb),
+            ("ast",  tp.proj_ast),
+            ("fg3m", tp.proj_fg3m),
         ]:
             attr = f"proj_{stat}"
             overridden = [p for p in active if getattr(p, f"_{stat}_overridden", False)]
