@@ -759,23 +759,36 @@ def main(full_rebuild: bool = False):
                 team_raw = pd.concat([team_raw, new_t], ignore_index=True)
 
         # Incremental update: fetch only recent games for the current season.
-        # This is the daily CI path — just 2 API calls instead of 10.
-        logger.info("Incremental update: fetching recent games for %s", CURRENT_SEASON)
-        new_p, new_t = _fetch_recent_games(CURRENT_SEASON, days_back=7)
-        if not new_p.empty:
-            logger.info("  Got %d new player rows", len(new_p))
-            if "GAME_ID" in player_raw.columns and "GAME_ID" in new_p.columns:
-                existing_ids = set(player_raw["GAME_ID"].astype(str))
-                new_p = new_p[~new_p["GAME_ID"].astype(str).isin(existing_ids)]
-            if not new_p.empty:
-                player_raw = pd.concat([player_raw, new_p], ignore_index=True)
-        if not new_t.empty:
-            logger.info("  Got %d new team rows", len(new_t))
-            if "GAME_ID" in team_raw.columns and "GAME_ID" in new_t.columns:
-                existing_ids = set(team_raw["GAME_ID"].astype(str))
-                new_t = new_t[~new_t["GAME_ID"].astype(str).isin(existing_ids)]
-            if not new_t.empty:
-                team_raw = pd.concat([team_raw, new_t], ignore_index=True)
+        # Skip during the off-season (mid-June through mid-September) — no games
+        # to fetch and the API endpoint either times out or returns nothing.
+        today = dt.date.today()
+        is_offseason = (today.month >= 7 and today.month <= 9) or \
+                       (today.month == 6 and today.day > 20) or \
+                       (today.month == 10 and today.day < 5)
+
+        if is_offseason:
+            logger.info("Off-season detected (%s) — skipping incremental game fetch. "
+                        "Cache is up to date from end of last season.", today)
+        else:
+            logger.info("Incremental update: fetching recent games for %s", CURRENT_SEASON)
+            try:
+                new_p, new_t = _fetch_recent_games(CURRENT_SEASON, days_back=7)
+                if not new_p.empty:
+                    logger.info("  Got %d new player rows", len(new_p))
+                    if "GAME_ID" in player_raw.columns and "GAME_ID" in new_p.columns:
+                        existing_ids = set(player_raw["GAME_ID"].astype(str))
+                        new_p = new_p[~new_p["GAME_ID"].astype(str).isin(existing_ids)]
+                    if not new_p.empty:
+                        player_raw = pd.concat([player_raw, new_p], ignore_index=True)
+                if not new_t.empty:
+                    logger.info("  Got %d new team rows", len(new_t))
+                    if "GAME_ID" in team_raw.columns and "GAME_ID" in new_t.columns:
+                        existing_ids = set(team_raw["GAME_ID"].astype(str))
+                        new_t = new_t[~new_t["GAME_ID"].astype(str).isin(existing_ids)]
+                    if not new_t.empty:
+                        team_raw = pd.concat([team_raw, new_t], ignore_index=True)
+            except Exception as e:
+                logger.warning("Incremental fetch failed (%s) — using existing cached data.", e)
 
     else:
         # No cache — full scrape. Fetch all seasons one at a time with delay.
