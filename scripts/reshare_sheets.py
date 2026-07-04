@@ -55,7 +55,7 @@ NBA_ROOT_FOLDER_ID    = "1G8W9-KPTLQ6ujCWvgwsqY6M8J3PCRyYB"
 
 # Set this after deploying the Apps Script web app
 # Go to: Apps Script > Deploy > Manage deployments > copy Deployment ID
-APPS_SCRIPT_DEPLOYMENT_ID = ""   # e.g. "AKfycb..."
+APPS_SCRIPT_DEPLOYMENT_ID = "AKfycbyBnykckX10SlWUEiNp7JjoAY8VGBjbGtXnNC-P2FkEeIv2Mxaud2RRmjUpL_WeQIkWMw"   # e.g. "AKfycb..."
 
 
 def trigger_apps_script_reshare() -> bool:
