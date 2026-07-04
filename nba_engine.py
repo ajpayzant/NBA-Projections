@@ -164,7 +164,8 @@ class PlayerProjection:
     _reb_pm:  float = 0.0
     _ast_pm:  float = 0.0
     _fg3m_pm: float = 0.0
-    _usg_ewm: float = 18.0  # usage % for USG-weighted minute reallocation
+    _usg_ewm: float = 18.0
+    _dnp_default: bool = False  # True when model defaults this player to inactive (low minutes history)
 
 
 @dataclass
@@ -569,7 +570,7 @@ class NBAPlayerModel:
                      "POS_GROUP", "SEASON", "GAME_DATE"] + ewm_cols + avg5_cols
         id_cols   = [c for c in id_cols if c in self.pg.columns]
 
-        # Take the last row per player (most recent state)
+        # Take the last row per player (most recent state across all seasons)
         latest = (
             self.pg[id_cols]
             .sort_values(["PLAYER_ID", "GAME_DATE"] if "GAME_DATE" in id_cols else ["PLAYER_ID"])
@@ -578,8 +579,14 @@ class NBAPlayerModel:
             .reset_index()
         )
 
-        # Count games played
-        gp = self.pg.groupby("PLAYER_ID").size().rename("games_played")
+        # Count games played in the two most recent seasons only (current-form signal)
+        seasons_sorted = sorted(self.pg["SEASON"].dropna().unique()) if "SEASON" in self.pg.columns else []
+        recent_seasons = set(seasons_sorted[-2:]) if len(seasons_sorted) >= 2 else set(seasons_sorted)
+        if recent_seasons and "SEASON" in self.pg.columns:
+            gp = (self.pg[self.pg["SEASON"].isin(recent_seasons)]
+                  .groupby("PLAYER_ID").size().rename("games_played"))
+        else:
+            gp = self.pg.groupby("PLAYER_ID").size().rename("games_played")
         latest = latest.merge(gp, on="PLAYER_ID", how="left")
         latest["games_played"] = latest["games_played"].fillna(0).astype(int)
 
@@ -588,19 +595,46 @@ class NBAPlayerModel:
             self._player_ratings[pid] = row.to_dict()
 
     def get_team_roster(self, team_abbr: str, season: Optional[str] = None) -> List[Dict]:
-        """Return all player ratings for a team in the current season."""
+        """Return player ratings for the team's current roster.
+
+        Uses a two-stage filter:
+        1. Find players who appeared for this team in the most recent season.
+        2. Keep only those whose *current* (most recent game) team matches —
+           this removes players who were traded away mid-season and now play
+           elsewhere, which would inflate the roster and crush each player's
+           projected minutes via the normalisation step.
+        """
         if self.pg.empty:
             return []
 
-        mask = self.pg["TEAM_ABBREVIATION"].astype(str).str.upper() == team_abbr.upper()
+        abbr_up = team_abbr.upper()
+        mask = self.pg["TEAM_ABBREVIATION"].astype(str).str.upper() == abbr_up
         if season and "SEASON" in self.pg.columns:
-            # Prefer current season, fall back to most recent
             curr_mask = mask & (self.pg["SEASON"] == season)
             if curr_mask.any():
                 mask = curr_mask
 
         team_pids = self.pg[mask]["PLAYER_ID"].dropna().astype(int).unique()
-        return [self._player_ratings[pid] for pid in team_pids if pid in self._player_ratings]
+
+        # Determine the two most recent seasons in the data for recency filtering
+        seasons_sorted = sorted(self.pg["SEASON"].dropna().unique()) if "SEASON" in self.pg.columns else []
+        recent_seasons = set(seasons_sorted[-2:]) if len(seasons_sorted) >= 2 else set(seasons_sorted)
+
+        result = []
+        for pid in team_pids:
+            if pid not in self._player_ratings:
+                continue
+            r = self._player_ratings[pid]
+            # Only include if player's most recent team is still this team
+            # (filters out players traded away mid-season or in prior seasons).
+            if str(r.get("TEAM_ABBREVIATION", "")).upper() != abbr_up:
+                continue
+            # Only include players who played in the two most recent seasons.
+            # This removes retired/waived players whose last game was years ago.
+            if recent_seasons and str(r.get("SEASON", "")) not in recent_seasons:
+                continue
+            result.append(r)
+        return result
 
     def _get_rate(self, ratings: Dict, rate_col: str, pos: str, default_key: str) -> float:
         val = _nan(ratings.get(rate_col), np.nan)
@@ -652,30 +686,21 @@ class NBAPlayerModel:
             proj_min = float(ov["minutes_override"])
             min_overridden = True
         else:
-            # Blend EWM (stable long-run) with AVG5 (recent form) for minutes
-            # Audit showed 54% of PTS error is explained by minutes error — get this right
+            # 70% EWM (long-run role) + 30% AVG5 (recent form).
+            # USG adjustment intentionally excluded: data shows USG has only 0.38
+            # correlation with minutes (vs 0.78 for MIN_EWM) and adding it inflates
+            # ball-dominant guards (e.g. high-USG stars hit the 48-min cap) while
+            # under-projecting defensive specialists and bigs who play heavy minutes
+            # with low usage. MIN_EWM already incorporates role/starter status.
             min_ewm  = _nan(ratings.get("MIN_EWM"),  pos_def["min"])
-            min_avg5 = _nan(ratings.get("MIN_AVG5"), min_ewm)  # fallback to EWM if no avg5
-            # 70% EWM + 30% last-5 avg: recent form matters but EWM more stable
+            min_avg5 = _nan(ratings.get("MIN_AVG5"), min_ewm)
             base_min = 0.70 * min_ewm + 0.30 * min_avg5 if min_avg5 > 0 else min_ewm
-
-            # USG-weighted minutes adjustment:
-            # High-usage players (stars) tend to play more than their EWM suggests
-            # because they're needed in close games. Low-usage bench players tend
-            # to be pulled when teams go up big.
-            # Apply a credibility-weighted tilt: USG vs league average (18%) pulls
-            # projected minutes in the same direction, up to ±3 minutes.
-            usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
-            lg_usg  = 18.0  # league average usage %
-            usg_diff = usg_ewm - lg_usg   # positive for high-usage, negative for low
-            # Each 1% of USG above average → +0.15 min adjustment (max ±3 min)
-            usg_min_adj = float(np.clip(usg_diff * 0.15, -3.0, 3.0))
 
             # Back-to-back: all players lose ~1.5 min on B2B nights
             is_b2b = bool(_nan(ratings.get("IS_B2B"), 0.0))
             b2b_adj = -1.5 if is_b2b else 0.0
 
-            proj_min = base_min + usg_min_adj + b2b_adj
+            proj_min = base_min + b2b_adj
 
         # Injury rating reduces minutes
         injury = float(ov.get("injury_rating", _nan(ratings.get("injury_rating"), 0.0)))
@@ -775,6 +800,7 @@ class NBAPlayerModel:
         proj._reb_pm  = reb_pm
         proj._ast_pm  = ast_pm
         proj._fg3m_pm = fg3m_pm
+        usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
         proj._usg_ewm = float(np.clip(usg_ewm, 8.0, 40.0))
         # Derived combos
         proj.proj_pra = proj.proj_pts + proj.proj_reb + proj.proj_ast
@@ -826,6 +852,12 @@ class NBAPlayerModel:
                 unique_ratings.append(r)
         roster_ratings = unique_ratings
 
+        # Players whose EWM minutes are below this threshold are unlikely to
+        # dress and play meaningful minutes. Default them to inactive so they
+        # don't deflate the rotation players' projected minutes via the
+        # normalisation step. Users can manually activate them in the depth chart.
+        DNP_MIN_THRESHOLD = 8.0
+
         projections = []
         for r in roster_ratings:
             pid = int(_nan(r.get("PLAYER_ID"), 0))
@@ -835,7 +867,20 @@ class NBAPlayerModel:
             r_with_ctx["IS_HOME"] = 1.0 if is_home else 0.0
             r_with_ctx["IS_B2B"]  = 1.0 if is_b2b  else 0.0
             proj = self.project_player(r_with_ctx, team_proj, ov)
-            proj.active = bool(ov.get("active", True))
+
+            # Determine active status:
+            # 1. User explicit override always wins
+            # 2. Players below DNP threshold default to inactive unless user said active
+            min_ewm = float(_nan(r.get("MIN_EWM"), 0.0))
+            user_set_active = "active" in ov
+            if user_set_active:
+                proj.active = bool(ov["active"])
+            elif min_ewm < DNP_MIN_THRESHOLD:
+                proj.active = False
+                proj._dnp_default = True
+            else:
+                proj.active = True
+
             if not proj.active or proj.injury_rating >= 1.0:
                 proj.active = False
                 proj = self._zero(proj)
@@ -853,77 +898,63 @@ class NBAPlayerModel:
     def _reconcile(self, projs: List[PlayerProjection],
                    tp: TeamProjection) -> List[PlayerProjection]:
         """
-        Scale active player projections so totals match team projection.
-        Also normalizes total minutes to NBA_TOTAL_MINUTES (240 = 5 × 48).
+        Assign final minutes and scale stats to match team projection.
+
+        Minutes strategy — "rotation fill":
+        Each player projects their own EWM-based minutes (no scaling).
+        Players are sorted by projected minutes (highest first) and added
+        to the lineup until the 240-minute game budget is exhausted.
+        The last player to fit gets whatever minutes remain; everyone after
+        them stays at their raw EWM projection (for reference but inactive).
+
+        Why this works:
+        - No artificial scaling that crushes star projections.
+        - Stars naturally play their historical role (Brown EWM ~36 → 36 min).
+        - Deep bench players fill whatever gap is left, or sit if the budget
+          is already consumed by the rotation.
+        - When a player is manually deactivated their minutes are redistributed
+          to the next eligible players by proportional fill.
+
+        USG-weighted reallocation excluded: 0.38 corr with MIN vs 0.78 for
+        MIN_EWM; adding USG pushed high-usage stars to the 48-min cap.
         """
-        NBA_TOTAL_MINUTES = 240.0   # 5 players × 48 minutes per regulation game
+        NBA_TOTAL_MINUTES = 240.0
 
         active = [p for p in projs if p.active]
         if not active:
             return projs
 
-        # ── Minutes normalization — USG-weighted reallocation ─────────────────
-        # Scale projected minutes so they sum to exactly 240.
-        # Fixed players (explicit override) stay unchanged.
-        # Free players scale proportionally to their USG — high-usage players
-        # absorb more of the missing minutes when a player is deactivated,
-        # which better reflects how coaches actually distribute minutes.
+        # ── Minutes normalization — rotation fill ─────────────────────────────
+        # Players with a user override keep their exact override value (fixed).
+        # The remaining free players fill the remaining budget in order of
+        # their raw projected minutes (highest first).
         min_overridden = [p for p in active if p._min_overridden]
         min_free       = [p for p in active if not p._min_overridden]
         fixed_min      = sum(p.proj_min for p in min_overridden)
-        free_min_sum   = sum(p.proj_min for p in min_free)
-        remaining_min  = max(NBA_TOTAL_MINUTES - fixed_min, 0.0)
+        budget         = max(NBA_TOTAL_MINUTES - fixed_min, 0.0)
 
-        if free_min_sum > 0 and remaining_min > 0:
-            # USG-weighted allocation with iterative cap handling.
-            # High-USG stars absorb more of the available minutes, but no one
-            # can exceed 48 minutes. Any surplus from capped players is
-            # redistributed to the remaining uncapped players.
-            usg_weights = []
-            for p2 in min_free:
-                usg = _nan(getattr(p2, "_usg_ewm", 18.0), 18.0)
-                usg = float(np.clip(usg, 8.0, 40.0))
-                usg_weights.append(p2.proj_min * (usg / 18.0))
+        if min_free:
+            # Sort by raw projected minutes descending
+            min_free_sorted = sorted(min_free, key=lambda p: p.proj_min, reverse=True)
+            remaining = budget
+            for p2 in min_free_sorted:
+                if remaining <= 0.0:
+                    # Budget exhausted — mark as DNP-default
+                    p2.proj_min = 0.0
+                    p2.active = False
+                    p2._dnp_default = True
+                    p2 = self._zero(p2)
+                elif p2.proj_min >= remaining:
+                    p2.proj_min = float(remaining)
+                    remaining = 0.0
+                else:
+                    remaining -= p2.proj_min
+                    # proj_min unchanged — player plays their natural role
 
-            total_weight = sum(usg_weights)
-            if total_weight > 0:
-                # Iterative allocation: distribute `remaining_min` minutes to free
-                # players weighted by USG. Any player whose share would exceed
-                # 48 min is capped and the surplus is redistributed to the rest.
-                pool        = remaining_min
-                allocated   = {p2.player_id: 0.0 for p2 in min_free}
-                weights_map = {p2.player_id: w for p2, w in zip(min_free, usg_weights)}
-                capped      = set()
-
-                for _ in range(len(min_free) + 1):
-                    free_ids = [p2.player_id for p2 in min_free if p2.player_id not in capped]
-                    free_w   = sum(weights_map[i] for i in free_ids)
-                    if free_w <= 0 or not free_ids:
-                        break
-                    surplus = 0.0
-                    tentative = {}
-                    for i in free_ids:
-                        share = pool * (weights_map[i] / free_w)
-                        tentative[i] = share
-                    for i in free_ids:
-                        total_so_far = allocated[i] + tentative[i]
-                        if total_so_far >= 48.0:
-                            surplus += total_so_far - 48.0
-                            allocated[i] = 48.0
-                            capped.add(i)
-                        else:
-                            allocated[i] = total_so_far
-                    if surplus <= 0.01:
-                        break
-                    pool = surplus
-
-                for p2 in min_free:
-                    p2.proj_min = float(np.clip(allocated.get(p2.player_id, 0.0), 0.0, 48.0))
-            else:
-                # Fallback: flat proportional
-                min_scale = remaining_min / free_min_sum
-                for p2 in min_free:
-                    p2.proj_min = float(np.clip(p2.proj_min * min_scale, 0.0, 48.0))
+        # Refresh the active list after rotation-fill may have changed active flags
+        active = [p for p in projs if p.active]
+        if not active:
+            return projs
 
         # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
         # After normalizing minutes, recompute raw stats from rates, then
