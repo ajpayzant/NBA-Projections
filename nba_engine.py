@@ -164,6 +164,8 @@ class PlayerProjection:
     _reb_pm:  float = 0.0
     _ast_pm:  float = 0.0
     _fg3m_pm: float = 0.0
+    # Original EWM rate (before USG redistribution) — used for lineup strength calc
+    _pts_pm_ewm_orig: float = 0.0
     _usg_ewm: float = 18.0
     _dnp_default: bool = False       # True when model defaults inactive (low minutes history)
     _user_deactivated: bool = False  # True when user explicitly set active=False
@@ -801,6 +803,9 @@ class NBAPlayerModel:
         proj._reb_pm  = reb_pm
         proj._ast_pm  = ast_pm
         proj._fg3m_pm = fg3m_pm
+        # Preserve original EWM rate before USG redistribution may adjust _pts_pm.
+        # Used to measure lineup strength via natural_sum = sum(orig_rate × proj_min).
+        proj._pts_pm_ewm_orig = pts_pm
         usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
         proj._usg_ewm = float(np.clip(usg_ewm, 8.0, 40.0))
         # Derived combos
@@ -1027,9 +1032,53 @@ class NBAPlayerModel:
                         p._reb_pm  *= (1.0 + (rate_mult - 1.0) * 0.5)
                         p._fg3m_pm *= rate_mult
 
+        # ── Lineup-strength adjustment ────────────────────────────────────────
+        # When stars are deactivated, the team model (possession-based) still
+        # projects the full team total — it has no knowledge of who is playing.
+        # We correct this by computing the NATURAL scoring of the active lineup
+        # (original EWM rate × post-fill minutes, before USG redistribution)
+        # and capping the team total at that amount when the lineup is depleted.
+        #
+        # natural_sum = sum(pts_pm_ewm_orig × proj_min) for active players
+        # This measures what the active lineup would produce at their historical
+        # rates, given the minutes they'll play. It's a pure bottom-up estimate.
+        #
+        # When lineup is full and healthy: natural_sum ≈ team_model_pts (within ~3%)
+        # so min(natural_sum, team_model) ≈ team_model — no change.
+        # When stars are out: natural_sum drops by their contribution, automatically
+        # reflecting the weaker lineup without any magic multipliers.
+        # USG redistribution (applied above) partially raises individual rates,
+        # but that inflates _pts_pm not _pts_pm_ewm_orig, so it doesn't affect
+        # the natural_sum anchor — correct, since teammates getting more possessions
+        # doesn't restore the team's total scoring capability.
+        natural_sum = sum(
+            getattr(p, "_pts_pm_ewm_orig", 0.0) * p.proj_min
+            for p in active
+            if p.proj_min > 0
+        )
+        # When the active lineup is weaker than the full-roster baseline, the
+        # possession-based team model overstates team scoring. Cap each stat at
+        # the natural lineup total, preserving the model when at full strength.
+        if tp.proj_pts > 0 and natural_sum < tp.proj_pts:
+            lineup_ratio = natural_sum / tp.proj_pts
+            adj_pts  = natural_sum
+            adj_reb  = tp.proj_reb  * lineup_ratio
+            adj_ast  = tp.proj_ast  * lineup_ratio
+            adj_fg3m = tp.proj_fg3m * lineup_ratio
+            # Update the TeamProjection so the simulator and UI see the corrected total
+            tp.proj_pts  = adj_pts
+            tp.proj_reb  = adj_reb
+            tp.proj_ast  = adj_ast
+            tp.proj_fg3m = adj_fg3m
+        else:
+            adj_pts  = tp.proj_pts
+            adj_reb  = tp.proj_reb
+            adj_ast  = tp.proj_ast
+            adj_fg3m = tp.proj_fg3m
+
         # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
         # After normalizing minutes, recompute raw stats from rates, then
-        # normalize PTS/REB/AST/FG3M totals to match team projection.
+        # normalize PTS/REB/AST/FG3M totals to match lineup-adjusted team total.
         for p in active:
             if not p._min_overridden:
                 # Recompute stats from rates × new minutes
@@ -1040,10 +1089,10 @@ class NBAPlayerModel:
                     p.proj_fg3m = max(p._fg3m_pm * p.proj_min, 0.0)
 
         for stat, team_total in [
-            ("pts",  tp.proj_pts),
-            ("reb",  tp.proj_reb),
-            ("ast",  tp.proj_ast),
-            ("fg3m", tp.proj_fg3m),
+            ("pts",  adj_pts),
+            ("reb",  adj_reb),
+            ("ast",  adj_ast),
+            ("fg3m", adj_fg3m),
         ]:
             attr = f"proj_{stat}"
             overridden = [p for p in active if getattr(p, f"_{stat}_overridden", False)]
@@ -1463,6 +1512,13 @@ class NBAProjectionEngine:
             current_season, active_player_ids=a_active_ids,
             is_home=False, is_b2b=a_is_b2b)
             if self.player_model else [])
+
+        # Recompute win probability after lineup adjustments may have changed
+        # h_proj.proj_pts / a_proj.proj_pts via _reconcile's natural-sum cap.
+        pt_diff_adj = h_proj.proj_pts - a_proj.proj_pts
+        q_home_adj = float(1.0 / (1.0 + np.exp(-pt_diff_adj / 8.0)))
+        h_proj.proj_win_prob = q_home_adj
+        a_proj.proj_win_prob = 1.0 - q_home_adj
 
         game_sim = self.simulator.simulate_game(h_proj, a_proj)
 
