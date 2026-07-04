@@ -598,12 +598,40 @@ class NBAPlayerModel:
         team_proj: TeamProjection,
         overrides: Optional[Dict[int, Dict]] = None,
         season: Optional[str] = None,
+        active_player_ids: Optional[List[int]] = None,
     ) -> List[PlayerProjection]:
-        """Project all players for a team and normalize totals to team projection."""
+        """
+        Project all players for a team and normalize totals to team projection.
+
+        active_player_ids: if provided, only include these player IDs.
+        This is populated from the current roster cache to ensure only
+        players on the current team are projected (not historical players).
+        """
         overrides = overrides or {}
         roster_ratings = self.get_team_roster(team_abbr, season)
         if not roster_ratings:
             return []
+
+        # Filter to current roster if available
+        if active_player_ids is not None:
+            id_set = set(active_player_ids)
+            roster_ratings = [r for r in roster_ratings
+                              if int(_nan(r.get("PLAYER_ID"), 0)) in id_set]
+            if not roster_ratings:
+                logger.warning("Roster filter removed all players for %s — "
+                               "falling back to full historical roster", team_abbr)
+                roster_ratings = self.get_team_roster(team_abbr, season)
+
+        # Deduplicate by player_id (keep most recent row)
+        seen = set()
+        unique_ratings = []
+        for r in sorted(roster_ratings,
+                        key=lambda x: str(x.get("GAME_DATE", "")), reverse=True):
+            pid = int(_nan(r.get("PLAYER_ID"), 0))
+            if pid not in seen:
+                seen.add(pid)
+                unique_ratings.append(r)
+        roster_ratings = unique_ratings
 
         projections = []
         for r in roster_ratings:
@@ -1002,11 +1030,22 @@ class NBAProjectionEngine:
             )
             return {pid: v for pid, v in ov.items() if pid in team_pids}
 
+        # Load current roster cache to filter to active players only
+        try:
+            from nba_roster_cache import get_active_player_ids
+            h_active_ids = get_active_player_ids(home_team_abbr) or None
+            a_active_ids = get_active_player_ids(away_team_abbr) or None
+        except Exception:
+            h_active_ids = None
+            a_active_ids = None
+
         h_players = (self.player_model.project_roster(
-            home_team_abbr, h_proj, _team_ov(home_team_abbr), current_season)
+            home_team_abbr, h_proj, _team_ov(home_team_abbr),
+            current_season, active_player_ids=h_active_ids)
             if self.player_model else [])
         a_players = (self.player_model.project_roster(
-            away_team_abbr, a_proj, _team_ov(away_team_abbr), current_season)
+            away_team_abbr, a_proj, _team_ov(away_team_abbr),
+            current_season, active_player_ids=a_active_ids)
             if self.player_model else [])
 
         game_sim = self.simulator.simulate_game(h_proj, a_proj)

@@ -1,0 +1,4305 @@
+{
+  "season": "2025-26",
+  "rosters": {
+    "ATL": [
+      {
+        "player_id": 1642933,
+        "player_name": "Keshon Gilbert",
+        "number": "None",
+        "position": "G",
+        "height": "6-4",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642484,
+        "player_name": "RayJ Dennis",
+        "number": "00",
+        "position": "G",
+        "height": "6-1",
+        "weight": "180"
+      },
+      {
+        "player_id": 1630228,
+        "player_name": "Jonathan Kuminga",
+        "number": "0",
+        "position": "F",
+        "height": "6-7",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630552,
+        "player_name": "Jalen Johnson",
+        "number": "1",
+        "position": "F",
+        "height": "6-8",
+        "weight": "219"
+      },
+      {
+        "player_id": 1630811,
+        "player_name": "Keaton Wallace",
+        "number": "2",
+        "position": "G",
+        "height": "6-3",
+        "weight": "185"
+      },
+      {
+        "player_id": 203468,
+        "player_name": "CJ McCollum",
+        "number": "3",
+        "position": "G",
+        "height": "6-3",
+        "weight": "190"
+      },
+      {
+        "player_id": 1629216,
+        "player_name": "Gabe Vincent",
+        "number": "4",
+        "position": "G",
+        "height": "6-2",
+        "weight": "200"
+      },
+      {
+        "player_id": 1630700,
+        "player_name": "Dyson Daniels",
+        "number": "5",
+        "position": "G",
+        "height": "6-7",
+        "weight": "199"
+      },
+      {
+        "player_id": 1629638,
+        "player_name": "Nickeil Alexander-Walker",
+        "number": "7",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 1627741,
+        "player_name": "Buddy Hield",
+        "number": "8",
+        "position": "G",
+        "height": "6-4",
+        "weight": "220"
+      },
+      {
+        "player_id": 1642258,
+        "player_name": "Zaccharie Risacher",
+        "number": "10",
+        "position": "F",
+        "height": "6-8",
+        "weight": "200"
+      },
+      {
+        "player_id": 1631132,
+        "player_name": "Christian Koloko",
+        "number": "10",
+        "position": "C",
+        "height": "6-11",
+        "weight": "225"
+      },
+      {
+        "player_id": 1628396,
+        "player_name": "Tony Bradley",
+        "number": "13",
+        "position": "C-F",
+        "height": "6-10",
+        "weight": "248"
+      },
+      {
+        "player_id": 1642854,
+        "player_name": "Asa Newell",
+        "number": "14",
+        "position": "F",
+        "height": "6-10",
+        "weight": "220"
+      },
+      {
+        "player_id": 1630168,
+        "player_name": "Onyeka Okongwu",
+        "number": "17",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "240"
+      },
+      {
+        "player_id": 1631243,
+        "player_name": "Mouhamed Gueye",
+        "number": "18",
+        "position": "F",
+        "height": "6-11",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630557,
+        "player_name": "Corey Kispert",
+        "number": "24",
+        "position": "F",
+        "height": "6-6",
+        "weight": "224"
+      },
+      {
+        "player_id": 1629111,
+        "player_name": "Jock Landale",
+        "number": "31",
+        "position": "C",
+        "height": "6-11",
+        "weight": "255"
+      }
+    ],
+    "BOS": [
+      {
+        "player_id": 1628369,
+        "player_name": "Jayson Tatum",
+        "number": "0",
+        "position": "F-G",
+        "height": "6-8",
+        "weight": "210"
+      },
+      {
+        "player_id": 202696,
+        "player_name": "Nikola Vučević",
+        "number": "4",
+        "position": "C",
+        "height": "6-9",
+        "weight": "265"
+      },
+      {
+        "player_id": 1627759,
+        "player_name": "Jaylen Brown",
+        "number": "7",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "223"
+      },
+      {
+        "player_id": 1642910,
+        "player_name": "John Tonje",
+        "number": "8",
+        "position": "G",
+        "height": "6-4",
+        "weight": "218"
+      },
+      {
+        "player_id": 1628401,
+        "player_name": "Derrick White",
+        "number": "9",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630202,
+        "player_name": "Payton Pritchard",
+        "number": "11",
+        "position": "G",
+        "height": "6-1",
+        "weight": "195"
+      },
+      {
+        "player_id": 1631199,
+        "player_name": "Ron Harper Jr.",
+        "number": "13",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "233"
+      },
+      {
+        "player_id": 1641775,
+        "player_name": "Jordan Walsh",
+        "number": "27",
+        "position": "G",
+        "height": "6-6",
+        "weight": "205"
+      },
+      {
+        "player_id": 1642864,
+        "player_name": "Hugo González",
+        "number": "28",
+        "position": "G",
+        "height": "6-6",
+        "weight": "200"
+      },
+      {
+        "player_id": 1630573,
+        "player_name": "Sam Hauser",
+        "number": "30",
+        "position": "F",
+        "height": "6-7",
+        "weight": "217"
+      },
+      {
+        "player_id": 1642917,
+        "player_name": "Max Shulga",
+        "number": "44",
+        "position": "G",
+        "height": "6-4",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630625,
+        "player_name": "Dalano Banton",
+        "number": "45",
+        "position": "F",
+        "height": "6-8",
+        "weight": "203"
+      },
+      {
+        "player_id": 1630568,
+        "player_name": "Luka Garza",
+        "number": "52",
+        "position": "C",
+        "height": "6-10",
+        "weight": "243"
+      },
+      {
+        "player_id": 1631248,
+        "player_name": "Baylor Scheierman",
+        "number": "55",
+        "position": "G",
+        "height": "6-6",
+        "weight": "205"
+      },
+      {
+        "player_id": 1642873,
+        "player_name": "Amari Williams",
+        "number": "77",
+        "position": "F-C",
+        "height": "6-11",
+        "weight": "250"
+      },
+      {
+        "player_id": 1629674,
+        "player_name": "Neemias Queta",
+        "number": "88",
+        "position": "C",
+        "height": "7-0",
+        "weight": "248"
+      }
+    ],
+    "BKN": [
+      {
+        "player_id": 1631169,
+        "player_name": "Josh Minott",
+        "number": "00",
+        "position": "F",
+        "height": "6-8",
+        "weight": "205"
+      },
+      {
+        "player_id": 1630533,
+        "player_name": "Ziaire Williams",
+        "number": "1",
+        "position": "F",
+        "height": "6-9",
+        "weight": "185"
+      },
+      {
+        "player_id": 1642874,
+        "player_name": "Danny Wolf",
+        "number": "2",
+        "position": "F",
+        "height": "6-11",
+        "weight": "250"
+      },
+      {
+        "player_id": 1642962,
+        "player_name": "Drake Powell",
+        "number": "4",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642856,
+        "player_name": "Egor Dëmin",
+        "number": "8",
+        "position": "G",
+        "height": "6-8",
+        "weight": "200"
+      },
+      {
+        "player_id": 1630604,
+        "player_name": "E.J. Liddell",
+        "number": "9",
+        "position": "F",
+        "height": "6-6",
+        "weight": "240"
+      },
+      {
+        "player_id": 1630623,
+        "player_name": "Tyson Etienne",
+        "number": "10",
+        "position": "G",
+        "height": "6-0",
+        "weight": "200"
+      },
+      {
+        "player_id": 1629611,
+        "player_name": "Terance Mann",
+        "number": "14",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1629008,
+        "player_name": "Michael Porter Jr.",
+        "number": "17",
+        "position": "F",
+        "height": "6-10",
+        "weight": "218"
+      },
+      {
+        "player_id": 1641869,
+        "player_name": "Malachi Smith",
+        "number": "18",
+        "position": "G",
+        "height": "6-4",
+        "weight": "205"
+      },
+      {
+        "player_id": 1630549,
+        "player_name": "Day'Ron Sharpe",
+        "number": "20",
+        "position": "C",
+        "height": "6-10",
+        "weight": "265"
+      },
+      {
+        "player_id": 1641730,
+        "player_name": "Noah Clowney",
+        "number": "21",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630592,
+        "player_name": "Jalen Wilson",
+        "number": "22",
+        "position": "F",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1630534,
+        "player_name": "Ochai Agbaji",
+        "number": "30",
+        "position": "G",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1643052,
+        "player_name": "Chaney Johnson",
+        "number": "31",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "220"
+      },
+      {
+        "player_id": 1629651,
+        "player_name": "Nic Claxton",
+        "number": "33",
+        "position": "C",
+        "height": "6-11",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642879,
+        "player_name": "Ben Saraf",
+        "number": "77",
+        "position": "G",
+        "height": "6-6",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642849,
+        "player_name": "Nolan Traore",
+        "number": "88",
+        "position": "G",
+        "height": "6-3",
+        "weight": "185"
+      }
+    ],
+    "CHA": [
+      {
+        "player_id": 1628970,
+        "player_name": "Miles Bridges",
+        "number": "0",
+        "position": "F",
+        "height": "6-7",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630163,
+        "player_name": "LaMelo Ball",
+        "number": "1",
+        "position": "G",
+        "height": "6-7",
+        "weight": "180"
+      },
+      {
+        "player_id": 1629684,
+        "player_name": "Grant Williams",
+        "number": "2",
+        "position": "F",
+        "height": "6-7",
+        "weight": "236"
+      },
+      {
+        "player_id": 1629632,
+        "player_name": "Coby White",
+        "number": "3",
+        "position": "G",
+        "height": "6-4",
+        "weight": "210"
+      },
+      {
+        "player_id": 1642883,
+        "player_name": "Sion James",
+        "number": "4",
+        "position": "G",
+        "height": "6-5",
+        "weight": "220"
+      },
+      {
+        "player_id": 1642851,
+        "player_name": "Kon Knueppel",
+        "number": "7",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630182,
+        "player_name": "Josh Green",
+        "number": "10",
+        "position": "G",
+        "height": "6-6",
+        "weight": "200"
+      },
+      {
+        "player_id": 1641750,
+        "player_name": "Ryan Kalkbrenner",
+        "number": "11",
+        "position": "C",
+        "height": "7-1",
+        "weight": "256"
+      },
+      {
+        "player_id": 1641810,
+        "player_name": "Antonio Reeves",
+        "number": "12",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 1631217,
+        "player_name": "Moussa Diabaté",
+        "number": "14",
+        "position": "F",
+        "height": "6-10",
+        "weight": "210"
+      },
+      {
+        "player_id": 1641790,
+        "player_name": "PJ Hall",
+        "number": "16",
+        "position": "C",
+        "height": "6-8",
+        "weight": "245"
+      },
+      {
+        "player_id": 1641787,
+        "player_name": "Tosan Evbuomwan",
+        "number": "20",
+        "position": "F",
+        "height": "6-8",
+        "weight": "217"
+      },
+      {
+        "player_id": 1626192,
+        "player_name": "Pat Connaughton",
+        "number": "21",
+        "position": "G",
+        "height": "6-5",
+        "weight": "209"
+      },
+      {
+        "player_id": 1630544,
+        "player_name": "Tre Mann",
+        "number": "23",
+        "position": "G",
+        "height": "6-4",
+        "weight": "178"
+      },
+      {
+        "player_id": 1641706,
+        "player_name": "Brandon Miller",
+        "number": "24",
+        "position": "F",
+        "height": "6-7",
+        "weight": "200"
+      },
+      {
+        "player_id": 1630214,
+        "player_name": "Xavier Tillman",
+        "number": "26",
+        "position": "F",
+        "height": "6-8",
+        "weight": "245"
+      },
+      {
+        "player_id": 1642275,
+        "player_name": "Tidjane Salaün",
+        "number": "31",
+        "position": "F",
+        "height": "6-10",
+        "weight": "207"
+      },
+      {
+        "player_id": 1642862,
+        "player_name": "Liam McNeeley",
+        "number": "33",
+        "position": "F",
+        "height": "6-7",
+        "weight": "210"
+      }
+    ],
+    "CHI": [
+      {
+        "player_id": 1629012,
+        "player_name": "Collin Sexton",
+        "number": "2",
+        "position": "G",
+        "height": "6-3",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630581,
+        "player_name": "Josh Giddey",
+        "number": "3",
+        "position": "G",
+        "height": "6-7",
+        "weight": "214"
+      },
+      {
+        "player_id": 1630644,
+        "player_name": "Mac McClung",
+        "number": "5",
+        "position": "G",
+        "height": "6-2",
+        "weight": "185"
+      },
+      {
+        "player_id": 1642265,
+        "player_name": "Rob Dillingham",
+        "number": "7",
+        "position": "G",
+        "height": "6-2",
+        "weight": "175"
+      },
+      {
+        "player_id": 1642530,
+        "player_name": "Yuki Kawamura",
+        "number": "8",
+        "position": "G",
+        "height": "5-7",
+        "weight": "159"
+      },
+      {
+        "player_id": 1631159,
+        "player_name": "Leonard Miller",
+        "number": "11",
+        "position": "F",
+        "height": "6-10",
+        "weight": "220"
+      },
+      {
+        "player_id": 1628380,
+        "player_name": "Zach Collins",
+        "number": "12",
+        "position": "F-C",
+        "height": "6-9",
+        "weight": "240"
+      },
+      {
+        "player_id": 1630208,
+        "player_name": "Nick Richards",
+        "number": "13",
+        "position": "C",
+        "height": "6-11",
+        "weight": "245"
+      },
+      {
+        "player_id": 1641824,
+        "player_name": "Matas Buzelis",
+        "number": "14",
+        "position": "F",
+        "height": "6-8",
+        "weight": "196"
+      },
+      {
+        "player_id": 1631338,
+        "player_name": "Mouhamadou Gueye",
+        "number": "16",
+        "position": "F",
+        "height": "6-9",
+        "weight": "210"
+      },
+      {
+        "player_id": 1629014,
+        "player_name": "Anfernee Simons",
+        "number": "22",
+        "position": "G",
+        "height": "6-3",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642855,
+        "player_name": "Noa Essengue",
+        "number": "24",
+        "position": "F",
+        "height": "6-8",
+        "weight": "194"
+      },
+      {
+        "player_id": 1630188,
+        "player_name": "Jalen Smith",
+        "number": "25",
+        "position": "F-C",
+        "height": "6-8",
+        "weight": "244"
+      },
+      {
+        "player_id": 1627824,
+        "player_name": "Guerschon Yabusele",
+        "number": "28",
+        "position": "F",
+        "height": "6-7",
+        "weight": "265"
+      },
+      {
+        "player_id": 1630200,
+        "player_name": "Tre Jones",
+        "number": "30",
+        "position": "G",
+        "height": "6-1",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630171,
+        "player_name": "Isaac Okoro",
+        "number": "35",
+        "position": "F-G",
+        "height": "6-4",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630172,
+        "player_name": "Patrick Williams",
+        "number": "44",
+        "position": "F",
+        "height": "6-6",
+        "weight": "235"
+      },
+      {
+        "player_id": 1642950,
+        "player_name": "Lachlan Olbrich",
+        "number": "47",
+        "position": "C",
+        "height": "6-8",
+        "weight": "236"
+      }
+    ],
+    "CLE": [
+      {
+        "player_id": 201935,
+        "player_name": "James Harden",
+        "number": "1",
+        "position": "G",
+        "height": "6-5",
+        "weight": "220"
+      },
+      {
+        "player_id": 1629622,
+        "player_name": "Max Strus",
+        "number": "2",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1628418,
+        "player_name": "Thomas Bryant",
+        "number": "3",
+        "position": "C-F",
+        "height": "6-9",
+        "weight": "248"
+      },
+      {
+        "player_id": 1630596,
+        "player_name": "Evan Mobley",
+        "number": "4",
+        "position": "C",
+        "height": "6-11",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630241,
+        "player_name": "Sam Merrill",
+        "number": "5",
+        "position": "G",
+        "height": "6-4",
+        "weight": "205"
+      },
+      {
+        "player_id": 203471,
+        "player_name": "Dennis Schröder",
+        "number": "8",
+        "position": "G",
+        "height": "6-1",
+        "weight": "175"
+      },
+      {
+        "player_id": 1641854,
+        "player_name": "Craig Porter Jr.",
+        "number": "9",
+        "position": "G",
+        "height": "6-1",
+        "weight": "180"
+      },
+      {
+        "player_id": 1642434,
+        "player_name": "Riley Minix",
+        "number": "12",
+        "position": "F",
+        "height": "6-7",
+        "weight": "230"
+      },
+      {
+        "player_id": 1631165,
+        "player_name": "Keon Ellis",
+        "number": "14",
+        "position": "G",
+        "height": "6-4",
+        "weight": "175"
+      },
+      {
+        "player_id": 1642281,
+        "player_name": "Jaylon Tyson",
+        "number": "20",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642400,
+        "player_name": "Tristan Enaruna",
+        "number": "21",
+        "position": "F",
+        "height": "6-7",
+        "weight": "220"
+      },
+      {
+        "player_id": 1626204,
+        "player_name": "Larry Nance Jr.",
+        "number": "22",
+        "position": "F-C",
+        "height": "6-6",
+        "weight": "245"
+      },
+      {
+        "player_id": 1642878,
+        "player_name": "Tyrese Proctor",
+        "number": "24",
+        "position": "G",
+        "height": "6-4",
+        "weight": "185"
+      },
+      {
+        "player_id": 1628386,
+        "player_name": "Jarrett Allen",
+        "number": "31",
+        "position": "C",
+        "height": "6-9",
+        "weight": "243"
+      },
+      {
+        "player_id": 1629731,
+        "player_name": "Dean Wade",
+        "number": "32",
+        "position": "F-C",
+        "height": "6-9",
+        "weight": "228"
+      },
+      {
+        "player_id": 1630846,
+        "player_name": "Olivier Sarr",
+        "number": "33",
+        "position": "C",
+        "height": "6-10",
+        "weight": "240"
+      },
+      {
+        "player_id": 1641772,
+        "player_name": "Nae'Qwan Tomlin",
+        "number": "35",
+        "position": "F",
+        "height": "6-8",
+        "weight": "210"
+      },
+      {
+        "player_id": 1628378,
+        "player_name": "Donovan Mitchell",
+        "number": "45",
+        "position": "G",
+        "height": "6-2",
+        "weight": "215"
+      }
+    ],
+    "DAL": [
+      {
+        "player_id": 1642967,
+        "player_name": "John Poulakidas",
+        "number": "None",
+        "position": "G",
+        "height": "6-6",
+        "weight": "205"
+      },
+      {
+        "player_id": 1631108,
+        "player_name": "Max Christie",
+        "number": "00",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1641726,
+        "player_name": "Dereck Lively II",
+        "number": "2",
+        "position": "C",
+        "height": "7-1",
+        "weight": "230"
+      },
+      {
+        "player_id": 203939,
+        "player_name": "Dwight Powell",
+        "number": "7",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "240"
+      },
+      {
+        "player_id": 1642358,
+        "player_name": "AJ Johnson",
+        "number": "8",
+        "position": "G",
+        "height": "6-5",
+        "weight": "160"
+      },
+      {
+        "player_id": 1642948,
+        "player_name": "Ryan Nembhard",
+        "number": "9",
+        "position": "G",
+        "height": "5-11",
+        "weight": "180"
+      },
+      {
+        "player_id": 1630314,
+        "player_name": "Brandon Williams",
+        "number": "10",
+        "position": "G",
+        "height": "6-1",
+        "weight": "190"
+      },
+      {
+        "player_id": 202681,
+        "player_name": "Kyrie Irving",
+        "number": "11",
+        "position": "G",
+        "height": "6-2",
+        "weight": "195"
+      },
+      {
+        "player_id": 1630230,
+        "player_name": "Naji Marshall",
+        "number": "13",
+        "position": "F",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1628997,
+        "player_name": "Caleb Martin",
+        "number": "16",
+        "position": "F",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 203114,
+        "player_name": "Khris Middleton",
+        "number": "20",
+        "position": "F",
+        "height": "6-7",
+        "weight": "222"
+      },
+      {
+        "player_id": 1629655,
+        "player_name": "Daniel Gafford",
+        "number": "21",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "265"
+      },
+      {
+        "player_id": 1641890,
+        "player_name": "Tyler Smith",
+        "number": "21",
+        "position": "F",
+        "height": "6-9",
+        "weight": "224"
+      },
+      {
+        "player_id": 1629023,
+        "player_name": "P.J. Washington",
+        "number": "25",
+        "position": "F",
+        "height": "6-7",
+        "weight": "230"
+      },
+      {
+        "player_id": 1630619,
+        "player_name": "Moussa Cisse",
+        "number": "30",
+        "position": "C",
+        "height": "6-11",
+        "weight": "220"
+      },
+      {
+        "player_id": 202691,
+        "player_name": "Klay Thompson",
+        "number": "31",
+        "position": "G",
+        "height": "6-5",
+        "weight": "220"
+      },
+      {
+        "player_id": 1642843,
+        "player_name": "Cooper Flagg",
+        "number": "32",
+        "position": "F",
+        "height": "6-9",
+        "weight": "205"
+      },
+      {
+        "player_id": 1628963,
+        "player_name": "Marvin Bagley III",
+        "number": "35",
+        "position": "F",
+        "height": "6-10",
+        "weight": "235"
+      }
+    ],
+    "DEN": [
+      {
+        "player_id": 1631128,
+        "player_name": "Christian Braun",
+        "number": "0",
+        "position": "G",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1642938,
+        "player_name": "Curtis Jones",
+        "number": "1",
+        "position": "G",
+        "height": "6-3",
+        "weight": "195"
+      },
+      {
+        "player_id": 1631124,
+        "player_name": "Julian Strawther",
+        "number": "3",
+        "position": "G",
+        "height": "6-6",
+        "weight": "205"
+      },
+      {
+        "player_id": 1626145,
+        "player_name": "Tyus Jones",
+        "number": "5",
+        "position": "G",
+        "height": "6-0",
+        "weight": "196"
+      },
+      {
+        "player_id": 1631212,
+        "player_name": "Peyton Watson",
+        "number": "8",
+        "position": "G",
+        "height": "6-8",
+        "weight": "200"
+      },
+      {
+        "player_id": 203501,
+        "player_name": "Tim Hardaway Jr.",
+        "number": "10",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 1628971,
+        "player_name": "Bruce Brown",
+        "number": "11",
+        "position": "G-F",
+        "height": "6-4",
+        "weight": "202"
+      },
+      {
+        "player_id": 1641747,
+        "player_name": "DaRon Holmes II",
+        "number": "14",
+        "position": "F",
+        "height": "6-9",
+        "weight": "225"
+      },
+      {
+        "player_id": 203999,
+        "player_name": "Nikola Jokić",
+        "number": "15",
+        "position": "C",
+        "height": "6-11",
+        "weight": "284"
+      },
+      {
+        "player_id": 202685,
+        "player_name": "Jonas Valančiūnas",
+        "number": "17",
+        "position": "C",
+        "height": "6-11",
+        "weight": "265"
+      },
+      {
+        "player_id": 1642461,
+        "player_name": "Spencer Jones",
+        "number": "21",
+        "position": "F",
+        "height": "6-7",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630192,
+        "player_name": "Zeke Nnaji",
+        "number": "22",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "240"
+      },
+      {
+        "player_id": 1629661,
+        "player_name": "Cameron Johnson",
+        "number": "23",
+        "position": "F",
+        "height": "6-8",
+        "weight": "210"
+      },
+      {
+        "player_id": 1629618,
+        "player_name": "Jalen Pickett",
+        "number": "24",
+        "position": "G",
+        "height": "6-2",
+        "weight": "202"
+      },
+      {
+        "player_id": 1642354,
+        "player_name": "KJ Simpson",
+        "number": "25",
+        "position": "G",
+        "height": "6-2",
+        "weight": "189"
+      },
+      {
+        "player_id": 1627750,
+        "player_name": "Jamal Murray",
+        "number": "27",
+        "position": "G",
+        "height": "6-4",
+        "weight": "215"
+      },
+      {
+        "player_id": 203932,
+        "player_name": "Aaron Gordon",
+        "number": "32",
+        "position": "F",
+        "height": "6-8",
+        "weight": "235"
+      },
+      {
+        "player_id": 1631223,
+        "player_name": "David Roddy",
+        "number": "45",
+        "position": "F",
+        "height": "6-5",
+        "weight": "255"
+      }
+    ],
+    "DET": [
+      {
+        "player_id": 1631105,
+        "player_name": "Jalen Duren",
+        "number": "0",
+        "position": "C",
+        "height": "6-10",
+        "weight": "250"
+      },
+      {
+        "player_id": 1630595,
+        "player_name": "Cade Cunningham",
+        "number": "2",
+        "position": "G",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1642403,
+        "player_name": "Isaac Jones",
+        "number": "3",
+        "position": "F",
+        "height": "6-8",
+        "weight": "245"
+      },
+      {
+        "player_id": 1641842,
+        "player_name": "Ronald Holland II",
+        "number": "5",
+        "position": "F",
+        "height": "6-8",
+        "weight": "206"
+      },
+      {
+        "player_id": 1630194,
+        "player_name": "Paul Reed",
+        "number": "7",
+        "position": "F",
+        "height": "6-9",
+        "weight": "210"
+      },
+      {
+        "player_id": 1627747,
+        "player_name": "Caris LeVert",
+        "number": "8",
+        "position": "G",
+        "height": "6-7",
+        "weight": "205"
+      },
+      {
+        "player_id": 1641709,
+        "player_name": "Ausar Thompson",
+        "number": "9",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "205"
+      },
+      {
+        "player_id": 202699,
+        "player_name": "Tobias Harris",
+        "number": "12",
+        "position": "F",
+        "height": "6-8",
+        "weight": "226"
+      },
+      {
+        "player_id": 1631111,
+        "player_name": "Wendell Moore Jr.",
+        "number": "14",
+        "position": "G",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642404,
+        "player_name": "Chaz Lanier",
+        "number": "20",
+        "position": "G",
+        "height": "6-3",
+        "weight": "206"
+      },
+      {
+        "player_id": 1642450,
+        "player_name": "Daniss Jenkins",
+        "number": "24",
+        "position": "G",
+        "height": "6-4",
+        "weight": "165"
+      },
+      {
+        "player_id": 1631204,
+        "player_name": "Marcus Sasser",
+        "number": "25",
+        "position": "G",
+        "height": "6-1",
+        "weight": "195"
+      },
+      {
+        "player_id": 1628989,
+        "player_name": "Kevin Huerter",
+        "number": "27",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630191,
+        "player_name": "Isaiah Stewart",
+        "number": "28",
+        "position": "F-C",
+        "height": "6-8",
+        "weight": "250"
+      },
+      {
+        "player_id": 1629750,
+        "player_name": "Javonte Green",
+        "number": "31",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 1642449,
+        "player_name": "Tolu Smith",
+        "number": "35",
+        "position": "F",
+        "height": "6-11",
+        "weight": "None"
+      },
+      {
+        "player_id": 1629130,
+        "player_name": "Duncan Robinson",
+        "number": "55",
+        "position": "F",
+        "height": "6-7",
+        "weight": "215"
+      }
+    ],
+    "GSW": [
+      {
+        "player_id": 1627780,
+        "player_name": "Gary Payton II",
+        "number": "0",
+        "position": "G",
+        "height": "6-2",
+        "weight": "195"
+      },
+      {
+        "player_id": 1641764,
+        "player_name": "Brandin Podziemski",
+        "number": "2",
+        "position": "G",
+        "height": "6-4",
+        "weight": "205"
+      },
+      {
+        "player_id": 1642954,
+        "player_name": "Will Richard",
+        "number": "3",
+        "position": "G",
+        "height": "6-3",
+        "weight": "206"
+      },
+      {
+        "player_id": 1630541,
+        "player_name": "Moses Moody",
+        "number": "4",
+        "position": "G",
+        "height": "6-5",
+        "weight": "211"
+      },
+      {
+        "player_id": 204001,
+        "player_name": "Kristaps Porziņģis",
+        "number": "7",
+        "position": "F-C",
+        "height": "7-2",
+        "weight": "240"
+      },
+      {
+        "player_id": 1629001,
+        "player_name": "De'Anthony Melton",
+        "number": "8",
+        "position": "G",
+        "height": "6-2",
+        "weight": "200"
+      },
+      {
+        "player_id": 202710,
+        "player_name": "Jimmy Butler III",
+        "number": "10",
+        "position": "F",
+        "height": "6-6",
+        "weight": "230"
+      },
+      {
+        "player_id": 1630611,
+        "player_name": "Gui Santos",
+        "number": "15",
+        "position": "F",
+        "height": "6-7",
+        "weight": "185"
+      },
+      {
+        "player_id": 1643018,
+        "player_name": "LJ Cryer",
+        "number": "18",
+        "position": "G",
+        "height": "6-0",
+        "weight": "None"
+      },
+      {
+        "player_id": 1631466,
+        "player_name": "Nate Williams",
+        "number": "19",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 201143,
+        "player_name": "Al Horford",
+        "number": "20",
+        "position": "C-F",
+        "height": "6-8",
+        "weight": "240"
+      },
+      {
+        "player_id": 1642366,
+        "player_name": "Quinten Post",
+        "number": "21",
+        "position": "C",
+        "height": "7-0",
+        "weight": "238"
+      },
+      {
+        "player_id": 203110,
+        "player_name": "Draymond Green",
+        "number": "23",
+        "position": "F",
+        "height": "6-6",
+        "weight": "230"
+      },
+      {
+        "player_id": 1629646,
+        "player_name": "Charles Bassey",
+        "number": "28",
+        "position": "C-F",
+        "height": "6-10",
+        "weight": "230"
+      },
+      {
+        "player_id": 201939,
+        "player_name": "Stephen Curry",
+        "number": "30",
+        "position": "G",
+        "height": "6-2",
+        "weight": "185"
+      },
+      {
+        "player_id": 203552,
+        "player_name": "Seth Curry",
+        "number": "31",
+        "position": "G",
+        "height": "6-1",
+        "weight": "185"
+      },
+      {
+        "player_id": 1642502,
+        "player_name": "Malevy Leons",
+        "number": "33",
+        "position": "F",
+        "height": "6-9",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630311,
+        "player_name": "Pat Spencer",
+        "number": "61",
+        "position": "G",
+        "height": "6-2",
+        "weight": "205"
+      }
+    ],
+    "HOU": [
+      {
+        "player_id": 1628988,
+        "player_name": "Aaron Holiday",
+        "number": "0",
+        "position": "G",
+        "height": "6-0",
+        "weight": "185"
+      },
+      {
+        "player_id": 1641708,
+        "player_name": "Amen Thompson",
+        "number": "1",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "200"
+      },
+      {
+        "player_id": 1627827,
+        "player_name": "Dorian Finney-Smith",
+        "number": "2",
+        "position": "F",
+        "height": "6-7",
+        "weight": "220"
+      },
+      {
+        "player_id": 1631120,
+        "player_name": "JD Davison",
+        "number": "4",
+        "position": "G",
+        "height": "6-1",
+        "weight": "195"
+      },
+      {
+        "player_id": 1627832,
+        "player_name": "Fred VanVleet",
+        "number": "5",
+        "position": "G",
+        "height": "6-0",
+        "weight": "197"
+      },
+      {
+        "player_id": 201142,
+        "player_name": "Kevin Durant",
+        "number": "7",
+        "position": "F",
+        "height": "6-11",
+        "weight": "240"
+      },
+      {
+        "player_id": 1630256,
+        "player_name": "Jae'Sean Tate",
+        "number": "8",
+        "position": "F",
+        "height": "6-4",
+        "weight": "230"
+      },
+      {
+        "player_id": 1631095,
+        "player_name": "Jabari Smith Jr.",
+        "number": "10",
+        "position": "F",
+        "height": "6-11",
+        "weight": "220"
+      },
+      {
+        "player_id": 203500,
+        "player_name": "Steven Adams",
+        "number": "12",
+        "position": "C",
+        "height": "6-11",
+        "weight": "265"
+      },
+      {
+        "player_id": 1641803,
+        "player_name": "Tristen Newton",
+        "number": "13",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1642263,
+        "player_name": "Reed Sheppard",
+        "number": "15",
+        "position": "G",
+        "height": "6-2",
+        "weight": "185"
+      },
+      {
+        "player_id": 1631106,
+        "player_name": "Tari Eason",
+        "number": "17",
+        "position": "F",
+        "height": "6-8",
+        "weight": "215"
+      },
+      {
+        "player_id": 1629006,
+        "player_name": "Josh Okogie",
+        "number": "20",
+        "position": "G",
+        "height": "6-4",
+        "weight": "213"
+      },
+      {
+        "player_id": 1642384,
+        "player_name": "Isaiah Crawford",
+        "number": "27",
+        "position": "F",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1630578,
+        "player_name": "Alperen Sengun",
+        "number": "28",
+        "position": "C",
+        "height": "6-11",
+        "weight": "243"
+      },
+      {
+        "player_id": 203991,
+        "player_name": "Clint Capela",
+        "number": "30",
+        "position": "C",
+        "height": "6-10",
+        "weight": "256"
+      },
+      {
+        "player_id": 201145,
+        "player_name": "Jeff Green",
+        "number": "32",
+        "position": "F",
+        "height": "6-8",
+        "weight": "235"
+      }
+    ],
+    "IND": [
+      {
+        "player_id": 1630169,
+        "player_name": "Tyrese Haliburton",
+        "number": "0",
+        "position": "G",
+        "height": "6-5",
+        "weight": "185"
+      },
+      {
+        "player_id": 1630167,
+        "player_name": "Obi Toppin",
+        "number": "1",
+        "position": "F",
+        "height": "6-9",
+        "weight": "220"
+      },
+      {
+        "player_id": 1629614,
+        "player_name": "Andrew Nembhard",
+        "number": "2",
+        "position": "G-F",
+        "height": "6-4",
+        "weight": "191"
+      },
+      {
+        "player_id": 1643007,
+        "player_name": "Taelon Peter",
+        "number": "4",
+        "position": "G",
+        "height": "6-3",
+        "weight": "185"
+      },
+      {
+        "player_id": 1641716,
+        "player_name": "Jarace Walker",
+        "number": "5",
+        "position": "F",
+        "height": "6-7",
+        "weight": "235"
+      },
+      {
+        "player_id": 1642880,
+        "player_name": "Kam Jones",
+        "number": "7",
+        "position": "G",
+        "height": "6-4",
+        "weight": "200"
+      },
+      {
+        "player_id": 204456,
+        "player_name": "T.J. McConnell",
+        "number": "9",
+        "position": "G",
+        "height": "6-1",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630695,
+        "player_name": "Micah Potter",
+        "number": "11",
+        "position": "C",
+        "height": "6-9",
+        "weight": "248"
+      },
+      {
+        "player_id": 1642277,
+        "player_name": "Johnny Furphy",
+        "number": "12",
+        "position": "G",
+        "height": "6-8",
+        "weight": "200"
+      },
+      {
+        "player_id": 1641771,
+        "player_name": "Jalen Slawson",
+        "number": "18",
+        "position": "F",
+        "height": "6-7",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630174,
+        "player_name": "Aaron Nesmith",
+        "number": "23",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1641738,
+        "player_name": "Kobe Brown",
+        "number": "24",
+        "position": "F",
+        "height": "6-7",
+        "weight": "250"
+      },
+      {
+        "player_id": 1641767,
+        "player_name": "Ben Sheppard",
+        "number": "26",
+        "position": "G",
+        "height": "6-6",
+        "weight": "190"
+      },
+      {
+        "player_id": 1631245,
+        "player_name": "Quenton Jackson",
+        "number": "29",
+        "position": "G",
+        "height": "6-4",
+        "weight": "173"
+      },
+      {
+        "player_id": 1630643,
+        "player_name": "Jay Huff",
+        "number": "32",
+        "position": "C",
+        "height": "7-1",
+        "weight": "240"
+      },
+      {
+        "player_id": 1627826,
+        "player_name": "Ivica Zubac",
+        "number": "40",
+        "position": "C",
+        "height": "7-0",
+        "weight": "240"
+      },
+      {
+        "player_id": 1627783,
+        "player_name": "Pascal Siakam",
+        "number": "43",
+        "position": "F",
+        "height": "6-8",
+        "weight": "245"
+      },
+      {
+        "player_id": 1630679,
+        "player_name": "Ethan Thompson",
+        "number": "55",
+        "position": "G",
+        "height": "6-4",
+        "weight": "195"
+      }
+    ],
+    "LAC": [
+      {
+        "player_id": 1641807,
+        "player_name": "Norchad Omier",
+        "number": "None",
+        "position": "F",
+        "height": "6-7",
+        "weight": "248"
+      },
+      {
+        "player_id": 1642951,
+        "player_name": "Sean Pedulla",
+        "number": "None",
+        "position": "G",
+        "height": "6-1",
+        "weight": "195"
+      },
+      {
+        "player_id": 203078,
+        "player_name": "Bradley Beal",
+        "number": "0",
+        "position": "G",
+        "height": "6-4",
+        "weight": "207"
+      },
+      {
+        "player_id": 202695,
+        "player_name": "Kawhi Leonard",
+        "number": "2",
+        "position": "F",
+        "height": "6-6",
+        "weight": "225"
+      },
+      {
+        "player_id": 1642920,
+        "player_name": "Kobe Sanders",
+        "number": "4",
+        "position": "G",
+        "height": "6-8",
+        "weight": "207"
+      },
+      {
+        "player_id": 1627884,
+        "player_name": "Derrick Jones Jr.",
+        "number": "5",
+        "position": "F",
+        "height": "6-6",
+        "weight": "210"
+      },
+      {
+        "player_id": 203992,
+        "player_name": "Bogdan Bogdanović",
+        "number": "7",
+        "position": "G",
+        "height": "6-5",
+        "weight": "225"
+      },
+      {
+        "player_id": 1627739,
+        "player_name": "Kris Dunn",
+        "number": "8",
+        "position": "G",
+        "height": "6-3",
+        "weight": "205"
+      },
+      {
+        "player_id": 1631097,
+        "player_name": "Bennedict Mathurin",
+        "number": "9",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "210"
+      },
+      {
+        "player_id": 1629636,
+        "player_name": "Darius Garland",
+        "number": "10",
+        "position": "G",
+        "height": "6-1",
+        "weight": "192"
+      },
+      {
+        "player_id": 201572,
+        "player_name": "Brook Lopez",
+        "number": "11",
+        "position": "C",
+        "height": "7-1",
+        "weight": "282"
+      },
+      {
+        "player_id": 1642353,
+        "player_name": "Cam Christie",
+        "number": "12",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1631102,
+        "player_name": "TyTy Washington Jr.",
+        "number": "14",
+        "position": "G",
+        "height": "6-3",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642949,
+        "player_name": "Yanic Konan Niederhäuser",
+        "number": "14",
+        "position": "C",
+        "height": "6-11",
+        "weight": "242"
+      },
+      {
+        "player_id": 1628381,
+        "player_name": "John Collins",
+        "number": "20",
+        "position": "F-C",
+        "height": "6-9",
+        "weight": "226"
+      },
+      {
+        "player_id": 1641757,
+        "player_name": "Jordan Miller",
+        "number": "22",
+        "position": "G",
+        "height": "6-5",
+        "weight": "194"
+      },
+      {
+        "player_id": 1630543,
+        "player_name": "Isaiah Jackson",
+        "number": "23",
+        "position": "F",
+        "height": "6-8",
+        "weight": "205"
+      },
+      {
+        "player_id": 201587,
+        "player_name": "Nicolas Batum",
+        "number": "33",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "230"
+      }
+    ],
+    "LAL": [
+      {
+        "player_id": 1642876,
+        "player_name": "Adou Thiero",
+        "number": "1",
+        "position": "G",
+        "height": "6-7",
+        "weight": "220"
+      },
+      {
+        "player_id": 1629020,
+        "player_name": "Jarred Vanderbilt",
+        "number": "2",
+        "position": "F",
+        "height": "6-8",
+        "weight": "214"
+      },
+      {
+        "player_id": 1642261,
+        "player_name": "Dalton Knecht",
+        "number": "4",
+        "position": "F",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1629028,
+        "player_name": "Deandre Ayton",
+        "number": "5",
+        "position": "C",
+        "height": "7-0",
+        "weight": "252"
+      },
+      {
+        "player_id": 1642355,
+        "player_name": "Bronny James",
+        "number": "9",
+        "position": "G",
+        "height": "6-2",
+        "weight": "210"
+      },
+      {
+        "player_id": 1628379,
+        "player_name": "Luke Kennard",
+        "number": "10",
+        "position": "G",
+        "height": "6-5",
+        "weight": "206"
+      },
+      {
+        "player_id": 1629637,
+        "player_name": "Jaxson Hayes",
+        "number": "11",
+        "position": "C-F",
+        "height": "7-0",
+        "weight": "220"
+      },
+      {
+        "player_id": 1631222,
+        "player_name": "Jake LaRavia",
+        "number": "12",
+        "position": "F",
+        "height": "6-7",
+        "weight": "235"
+      },
+      {
+        "player_id": 1628467,
+        "player_name": "Maxi Kleber",
+        "number": "14",
+        "position": "F",
+        "height": "6-10",
+        "weight": "240"
+      },
+      {
+        "player_id": 1630559,
+        "player_name": "Austin Reaves",
+        "number": "15",
+        "position": "G",
+        "height": "6-5",
+        "weight": "197"
+      },
+      {
+        "player_id": 1631166,
+        "player_name": "Drew Timme",
+        "number": "17",
+        "position": "F",
+        "height": "6-9",
+        "weight": "235"
+      },
+      {
+        "player_id": 1641733,
+        "player_name": "Nick Smith Jr.",
+        "number": "20",
+        "position": "G",
+        "height": "6-2",
+        "weight": "185"
+      },
+      {
+        "player_id": 2544,
+        "player_name": "LeBron James",
+        "number": "23",
+        "position": "F",
+        "height": "6-9",
+        "weight": "250"
+      },
+      {
+        "player_id": 1629060,
+        "player_name": "Rui Hachimura",
+        "number": "28",
+        "position": "F",
+        "height": "6-8",
+        "weight": "230"
+      },
+      {
+        "player_id": 1643024,
+        "player_name": "Chris Mañon",
+        "number": "30",
+        "position": "G",
+        "height": "6-4",
+        "weight": "209"
+      },
+      {
+        "player_id": 203935,
+        "player_name": "Marcus Smart",
+        "number": "36",
+        "position": "G",
+        "height": "6-3",
+        "weight": "220"
+      },
+      {
+        "player_id": 1629029,
+        "player_name": "Luka Dončić",
+        "number": "77",
+        "position": "F-G",
+        "height": "6-8",
+        "weight": "230"
+      }
+    ],
+    "MEM": [
+      {
+        "player_id": 1642942,
+        "player_name": "Jahmai Mashack",
+        "number": "None",
+        "position": "G",
+        "height": "6-4",
+        "weight": "203"
+      },
+      {
+        "player_id": 1642377,
+        "player_name": "Jaylen Wells",
+        "number": "0",
+        "position": "F",
+        "height": "6-7",
+        "weight": "None"
+      },
+      {
+        "player_id": 1630590,
+        "player_name": "Scotty Pippen Jr.",
+        "number": "1",
+        "position": "G",
+        "height": "6-2",
+        "weight": "170"
+      },
+      {
+        "player_id": 1629660,
+        "player_name": "Ty Jerome",
+        "number": "2",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "195"
+      },
+      {
+        "player_id": 203484,
+        "player_name": "Kentavious Caldwell-Pope",
+        "number": "3",
+        "position": "G",
+        "height": "6-5",
+        "weight": "204"
+      },
+      {
+        "player_id": 1642383,
+        "player_name": "Walter Clayton Jr.",
+        "number": "4",
+        "position": "G",
+        "height": "6-4",
+        "weight": "195"
+      },
+      {
+        "player_id": 1630583,
+        "player_name": "Santi Aldama",
+        "number": "7",
+        "position": "F-C",
+        "height": "7-0",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642914,
+        "player_name": "Javon Small",
+        "number": "10",
+        "position": "G",
+        "height": "6-1",
+        "weight": "190"
+      },
+      {
+        "player_id": 1629630,
+        "player_name": "Ja Morant",
+        "number": "12",
+        "position": "G",
+        "height": "6-2",
+        "weight": "174"
+      },
+      {
+        "player_id": 1641744,
+        "player_name": "Zach Edey",
+        "number": "14",
+        "position": "C",
+        "height": "7-3",
+        "weight": "305"
+      },
+      {
+        "player_id": 1629634,
+        "player_name": "Brandon Clarke",
+        "number": "15",
+        "position": "F",
+        "height": "6-8",
+        "weight": "215"
+      },
+      {
+        "player_id": 1641765,
+        "player_name": "Olivier-Maxence Prosper",
+        "number": "18",
+        "position": "F",
+        "height": "6-7",
+        "weight": "230"
+      },
+      {
+        "player_id": 1641712,
+        "player_name": "Rayan Rupert",
+        "number": "21",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "205"
+      },
+      {
+        "player_id": 1641707,
+        "player_name": "Taylor Hendricks",
+        "number": "22",
+        "position": "F",
+        "height": "6-9",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642907,
+        "player_name": "Cedric Coward",
+        "number": "23",
+        "position": "G",
+        "height": "6-5",
+        "weight": "206"
+      },
+      {
+        "player_id": 1642285,
+        "player_name": "Cam Spencer",
+        "number": "24",
+        "position": "G",
+        "height": "6-3",
+        "weight": "205"
+      },
+      {
+        "player_id": 1641713,
+        "player_name": "GG Jackson",
+        "number": "45",
+        "position": "F",
+        "height": "6-9",
+        "weight": "210"
+      },
+      {
+        "player_id": 201959,
+        "player_name": "Taj Gibson",
+        "number": "67",
+        "position": "F",
+        "height": "6-9",
+        "weight": "232"
+      }
+    ],
+    "MIA": [
+      {
+        "player_id": 1631323,
+        "player_name": "Simone Fontecchio",
+        "number": "0",
+        "position": "F",
+        "height": "6-7",
+        "weight": "209"
+      },
+      {
+        "player_id": 1631211,
+        "player_name": "Trevor Keels",
+        "number": "3",
+        "position": "G",
+        "height": "6-3",
+        "weight": "215"
+      },
+      {
+        "player_id": 1631107,
+        "player_name": "Nikola Jović",
+        "number": "5",
+        "position": "F",
+        "height": "6-10",
+        "weight": "205"
+      },
+      {
+        "player_id": 1642276,
+        "player_name": "Kel'el Ware",
+        "number": "7",
+        "position": "C",
+        "height": "7-0",
+        "weight": "230"
+      },
+      {
+        "player_id": 1641796,
+        "player_name": "Pelle Larsson",
+        "number": "9",
+        "position": "G",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1631170,
+        "player_name": "Jaime Jaquez Jr.",
+        "number": "11",
+        "position": "G",
+        "height": "6-6",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630696,
+        "player_name": "Dru Smith",
+        "number": "12",
+        "position": "G",
+        "height": "6-2",
+        "weight": "203"
+      },
+      {
+        "player_id": 1628389,
+        "player_name": "Bam Adebayo",
+        "number": "13",
+        "position": "C-F",
+        "height": "6-9",
+        "weight": "255"
+      },
+      {
+        "player_id": 1629639,
+        "player_name": "Tyler Herro",
+        "number": "14",
+        "position": "G",
+        "height": "6-5",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642066,
+        "player_name": "Myron Gardner",
+        "number": "15",
+        "position": "F",
+        "height": "6-5",
+        "weight": "220"
+      },
+      {
+        "player_id": 1642352,
+        "player_name": "Keshad Johnson",
+        "number": "16",
+        "position": "F",
+        "height": "6-6",
+        "weight": "225"
+      },
+      {
+        "player_id": 1642443,
+        "player_name": "Jahmir Young",
+        "number": "17",
+        "position": "G",
+        "height": "6-0",
+        "weight": "185"
+      },
+      {
+        "player_id": 203952,
+        "player_name": "Andrew Wiggins",
+        "number": "22",
+        "position": "F",
+        "height": "6-6",
+        "weight": "197"
+      },
+      {
+        "player_id": 1626181,
+        "player_name": "Norman Powell",
+        "number": "24",
+        "position": "G",
+        "height": "6-3",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642857,
+        "player_name": "Kasparas Jakučionis",
+        "number": "25",
+        "position": "G",
+        "height": "6-5",
+        "weight": "200"
+      },
+      {
+        "player_id": 1630558,
+        "player_name": "Davion Mitchell",
+        "number": "45",
+        "position": "G",
+        "height": "6-0",
+        "weight": "202"
+      },
+      {
+        "player_id": 1642884,
+        "player_name": "Vladislav Goldin",
+        "number": "50",
+        "position": "C",
+        "height": "7-0",
+        "weight": "250"
+      }
+    ],
+    "MIL": [
+      {
+        "player_id": 1630579,
+        "player_name": "Jericho Sims",
+        "number": "00",
+        "position": "C",
+        "height": "6-10",
+        "weight": "250"
+      },
+      {
+        "player_id": 1626167,
+        "player_name": "Myles Turner",
+        "number": "3",
+        "position": "C-F",
+        "height": "6-11",
+        "weight": "250"
+      },
+      {
+        "player_id": 1629018,
+        "player_name": "Gary Trent Jr.",
+        "number": "5",
+        "position": "G",
+        "height": "6-5",
+        "weight": "204"
+      },
+      {
+        "player_id": 1629645,
+        "player_name": "Kevin Porter Jr.",
+        "number": "7",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "203"
+      },
+      {
+        "player_id": 1626171,
+        "player_name": "Bobby Portis",
+        "number": "9",
+        "position": "F",
+        "height": "6-9",
+        "weight": "250"
+      },
+      {
+        "player_id": 203914,
+        "player_name": "Gary Harris",
+        "number": "11",
+        "position": "G",
+        "height": "6-4",
+        "weight": "210"
+      },
+      {
+        "player_id": 1627752,
+        "player_name": "Taurean Prince",
+        "number": "12",
+        "position": "F",
+        "height": "6-6",
+        "weight": "218"
+      },
+      {
+        "player_id": 1631157,
+        "player_name": "Ryan Rollins",
+        "number": "13",
+        "position": "G",
+        "height": "6-3",
+        "weight": "180"
+      },
+      {
+        "player_id": 1628398,
+        "player_name": "Kyle Kuzma",
+        "number": "18",
+        "position": "F",
+        "height": "6-8",
+        "weight": "221"
+      },
+      {
+        "player_id": 1631260,
+        "player_name": "AJ Green",
+        "number": "20",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      },
+      {
+        "player_id": 1631172,
+        "player_name": "Ousmane Dieng",
+        "number": "21",
+        "position": "F",
+        "height": "6-9",
+        "weight": "185"
+      },
+      {
+        "player_id": 1630828,
+        "player_name": "Alex Antetokounmpo",
+        "number": "29",
+        "position": "F",
+        "height": "6-8",
+        "weight": "214"
+      },
+      {
+        "player_id": 1642504,
+        "player_name": "Cormac Ryan",
+        "number": "30",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 203507,
+        "player_name": "Giannis Antetokounmpo",
+        "number": "34",
+        "position": "F",
+        "height": "6-11",
+        "weight": "243"
+      },
+      {
+        "player_id": 1631250,
+        "player_name": "Pete Nance",
+        "number": "35",
+        "position": "F",
+        "height": "6-9",
+        "weight": "225"
+      },
+      {
+        "player_id": 203648,
+        "player_name": "Thanasis Antetokounmpo",
+        "number": "43",
+        "position": "F",
+        "height": "6-7",
+        "weight": "219"
+      },
+      {
+        "player_id": 1641748,
+        "player_name": "Andre Jackson Jr.",
+        "number": "44",
+        "position": "G",
+        "height": "6-6",
+        "weight": "209"
+      }
+    ],
+    "MIN": [
+      {
+        "player_id": 1628978,
+        "player_name": "Donte DiVincenzo",
+        "number": "0",
+        "position": "G",
+        "height": "6-4",
+        "weight": "203"
+      },
+      {
+        "player_id": 1630545,
+        "player_name": "Terrence Shannon Jr.",
+        "number": "1",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630183,
+        "player_name": "Jaden McDaniels",
+        "number": "3",
+        "position": "F",
+        "height": "6-9",
+        "weight": "185"
+      },
+      {
+        "player_id": 1641763,
+        "player_name": "Julian Phillips",
+        "number": "4",
+        "position": "F",
+        "height": "6-6",
+        "weight": "201"
+      },
+      {
+        "player_id": 1630162,
+        "player_name": "Anthony Edwards",
+        "number": "5",
+        "position": "G",
+        "height": "6-4",
+        "weight": "225"
+      },
+      {
+        "player_id": 204060,
+        "player_name": "Joe Ingles",
+        "number": "7",
+        "position": "F-G",
+        "height": "6-8",
+        "weight": "220"
+      },
+      {
+        "player_id": 1630538,
+        "player_name": "Bones Hyland",
+        "number": "8",
+        "position": "G",
+        "height": "6-2",
+        "weight": "169"
+      },
+      {
+        "player_id": 201144,
+        "player_name": "Mike Conley",
+        "number": "10",
+        "position": "G",
+        "height": "6-1",
+        "weight": "175"
+      },
+      {
+        "player_id": 1629675,
+        "player_name": "Naz Reid",
+        "number": "11",
+        "position": "C-F",
+        "height": "6-9",
+        "weight": "264"
+      },
+      {
+        "player_id": 203937,
+        "player_name": "Kyle Anderson",
+        "number": "12",
+        "position": "F-G",
+        "height": "6-8",
+        "weight": "230"
+      },
+      {
+        "player_id": 1630245,
+        "player_name": "Ayo Dosunmu",
+        "number": "13",
+        "position": "G",
+        "height": "6-4",
+        "weight": "201"
+      },
+      {
+        "player_id": 1642389,
+        "player_name": "Zyon Pullin",
+        "number": "15",
+        "position": "G",
+        "height": "6-4",
+        "weight": "206"
+      },
+      {
+        "player_id": 1642866,
+        "player_name": "Joan Beringer",
+        "number": "19",
+        "position": "F",
+        "height": "6-11",
+        "weight": "230"
+      },
+      {
+        "player_id": 1641740,
+        "player_name": "Jaylen Clark",
+        "number": "22",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 1642402,
+        "player_name": "Enrique Freeman",
+        "number": "25",
+        "position": "F",
+        "height": "6-9",
+        "weight": "220"
+      },
+      {
+        "player_id": 203497,
+        "player_name": "Rudy Gobert",
+        "number": "27",
+        "position": "C",
+        "height": "7-1",
+        "weight": "258"
+      },
+      {
+        "player_id": 203944,
+        "player_name": "Julius Randle",
+        "number": "30",
+        "position": "F-C",
+        "height": "6-9",
+        "weight": "250"
+      },
+      {
+        "player_id": 1642911,
+        "player_name": "Rocco Zikarsky",
+        "number": "44",
+        "position": "C",
+        "height": "7-3",
+        "weight": "227"
+      }
+    ],
+    "NOP": [
+      {
+        "player_id": 1642490,
+        "player_name": "Josh Oduro",
+        "number": "None",
+        "position": "C",
+        "height": "6-9",
+        "weight": "240"
+      },
+      {
+        "player_id": 1642847,
+        "player_name": "Jeremiah Fears",
+        "number": "0",
+        "position": "G",
+        "height": "6-3",
+        "weight": "190"
+      },
+      {
+        "player_id": 1629627,
+        "player_name": "Zion Williamson",
+        "number": "1",
+        "position": "F",
+        "height": "6-6",
+        "weight": "284"
+      },
+      {
+        "player_id": 1630529,
+        "player_name": "Herbert Jones",
+        "number": "2",
+        "position": "F",
+        "height": "6-7",
+        "weight": "206"
+      },
+      {
+        "player_id": 1629673,
+        "player_name": "Jordan Poole",
+        "number": "3",
+        "position": "G",
+        "height": "6-4",
+        "weight": "194"
+      },
+      {
+        "player_id": 1630621,
+        "player_name": "Hunter Dickinson",
+        "number": "4",
+        "position": "C",
+        "height": "7-1",
+        "weight": "255"
+      },
+      {
+        "player_id": 1627749,
+        "player_name": "Dejounte Murray",
+        "number": "5",
+        "position": "G",
+        "height": "6-4",
+        "weight": "180"
+      },
+      {
+        "player_id": 201599,
+        "player_name": "DeAndre Jordan",
+        "number": "9",
+        "position": "C",
+        "height": "6-11",
+        "weight": "265"
+      },
+      {
+        "player_id": 1631121,
+        "player_name": "Bryce McGowens",
+        "number": "11",
+        "position": "G",
+        "height": "6-6",
+        "weight": "190"
+      },
+      {
+        "player_id": 1642877,
+        "player_name": "Micah Peavy",
+        "number": "14",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "215"
+      },
+      {
+        "player_id": 1631255,
+        "player_name": "Karlo Matković",
+        "number": "17",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "231"
+      },
+      {
+        "player_id": 1642274,
+        "player_name": "Yves Missi",
+        "number": "21",
+        "position": "C",
+        "height": "6-11",
+        "weight": "235"
+      },
+      {
+        "player_id": 1642852,
+        "player_name": "Derik Queen",
+        "number": "22",
+        "position": "C",
+        "height": "6-9",
+        "weight": "250"
+      },
+      {
+        "player_id": 1641725,
+        "player_name": "Trey Alexander",
+        "number": "23",
+        "position": "G",
+        "height": "6-5",
+        "weight": "185"
+      },
+      {
+        "player_id": 1641722,
+        "player_name": "Jordan Hawkins",
+        "number": "24",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630530,
+        "player_name": "Trey Murphy III",
+        "number": "25",
+        "position": "F",
+        "height": "6-8",
+        "weight": "206"
+      },
+      {
+        "player_id": 1630180,
+        "player_name": "Saddiq Bey",
+        "number": "41",
+        "position": "G-F",
+        "height": "6-8",
+        "weight": "215"
+      },
+      {
+        "player_id": 1626172,
+        "player_name": "Kevon Looney",
+        "number": "55",
+        "position": "F",
+        "height": "6-9",
+        "weight": "222"
+      }
+    ],
+    "NYK": [
+      {
+        "player_id": 203903,
+        "player_name": "Jordan Clarkson",
+        "number": "00",
+        "position": "G",
+        "height": "6-5",
+        "weight": "194"
+      },
+      {
+        "player_id": 1641794,
+        "player_name": "Dillon Jones",
+        "number": "",
+        "position": "F",
+        "height": "6-5",
+        "weight": "235"
+      },
+      {
+        "player_id": 1630540,
+        "player_name": "Miles McBride",
+        "number": "2",
+        "position": "G",
+        "height": "6-2",
+        "weight": "195"
+      },
+      {
+        "player_id": 1628404,
+        "player_name": "Josh Hart",
+        "number": "3",
+        "position": "G",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642359,
+        "player_name": "Pacôme Dadiet",
+        "number": "4",
+        "position": "F",
+        "height": "6-9",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630631,
+        "player_name": "Jose Alvarado",
+        "number": "5",
+        "position": "G",
+        "height": "6-0",
+        "weight": "179"
+      },
+      {
+        "player_id": 1628384,
+        "player_name": "OG Anunoby",
+        "number": "8",
+        "position": "F-G",
+        "height": "6-7",
+        "weight": "240"
+      },
+      {
+        "player_id": 1641755,
+        "player_name": "Kevin McCullar Jr.",
+        "number": "9",
+        "position": "G",
+        "height": "6-6",
+        "weight": "210"
+      },
+      {
+        "player_id": 1628973,
+        "player_name": "Jalen Brunson",
+        "number": "11",
+        "position": "G",
+        "height": "6-2",
+        "weight": "190"
+      },
+      {
+        "player_id": 1642278,
+        "player_name": "Tyler Kolek",
+        "number": "13",
+        "position": "G",
+        "height": "6-2",
+        "weight": "195"
+      },
+      {
+        "player_id": 1631110,
+        "player_name": "Jeremy Sochan",
+        "number": "20",
+        "position": "F",
+        "height": "6-8",
+        "weight": "230"
+      },
+      {
+        "player_id": 1629011,
+        "player_name": "Mitchell Robinson",
+        "number": "23",
+        "position": "C-F",
+        "height": "7-0",
+        "weight": "240"
+      },
+      {
+        "player_id": 1628969,
+        "player_name": "Mikal Bridges",
+        "number": "25",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "209"
+      },
+      {
+        "player_id": 1626157,
+        "player_name": "Karl-Anthony Towns",
+        "number": "32",
+        "position": "C-F",
+        "height": "7-0",
+        "weight": "248"
+      },
+      {
+        "player_id": 1629013,
+        "player_name": "Landry Shamet",
+        "number": "44",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1641998,
+        "player_name": "Trey Jemison III",
+        "number": "50",
+        "position": "C",
+        "height": "6-10",
+        "weight": "270"
+      },
+      {
+        "player_id": 1642885,
+        "player_name": "Mohamed Diawara",
+        "number": "51",
+        "position": "F",
+        "height": "6-9",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630574,
+        "player_name": "Ariel Hukporti",
+        "number": "55",
+        "position": "C",
+        "height": "7-0",
+        "weight": "246"
+      }
+    ],
+    "OKC": [
+      {
+        "player_id": 1628983,
+        "player_name": "Shai Gilgeous-Alexander",
+        "number": "2",
+        "position": "G",
+        "height": "6-6",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642272,
+        "player_name": "Jared McCain",
+        "number": "3",
+        "position": "G",
+        "height": "6-3",
+        "weight": "195"
+      },
+      {
+        "player_id": 1629652,
+        "player_name": "Luguentz Dort",
+        "number": "5",
+        "position": "G",
+        "height": "6-4",
+        "weight": "220"
+      },
+      {
+        "player_id": 1631119,
+        "player_name": "Jaylin Williams",
+        "number": "6",
+        "position": "F",
+        "height": "6-9",
+        "weight": "240"
+      },
+      {
+        "player_id": 1631096,
+        "player_name": "Chet Holmgren",
+        "number": "7",
+        "position": "C-F",
+        "height": "7-1",
+        "weight": "208"
+      },
+      {
+        "player_id": 1631114,
+        "player_name": "Jalen Williams",
+        "number": "8",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "211"
+      },
+      {
+        "player_id": 1627936,
+        "player_name": "Alex Caruso",
+        "number": "9",
+        "position": "G",
+        "height": "6-5",
+        "weight": "186"
+      },
+      {
+        "player_id": 1630198,
+        "player_name": "Isaiah Joe",
+        "number": "11",
+        "position": "G",
+        "height": "6-4",
+        "weight": "165"
+      },
+      {
+        "player_id": 1642850,
+        "player_name": "Thomas Sorber",
+        "number": "12",
+        "position": "C",
+        "height": "6-9",
+        "weight": "250"
+      },
+      {
+        "player_id": 1642362,
+        "player_name": "Payton Sandfort",
+        "number": "14",
+        "position": "F",
+        "height": "6-7",
+        "weight": "215"
+      },
+      {
+        "player_id": 1642382,
+        "player_name": "Branden Carlson",
+        "number": "15",
+        "position": "C",
+        "height": "7-0",
+        "weight": "220"
+      },
+      {
+        "player_id": 1630598,
+        "player_name": "Aaron Wiggins",
+        "number": "21",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1641717,
+        "player_name": "Cason Wallace",
+        "number": "22",
+        "position": "G",
+        "height": "6-3",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642964,
+        "player_name": "Brooks Barnhizer",
+        "number": "23",
+        "position": "G",
+        "height": "6-5",
+        "weight": "230"
+      },
+      {
+        "player_id": 1642349,
+        "player_name": "Ajay Mitchell",
+        "number": "25",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      },
+      {
+        "player_id": 1629026,
+        "player_name": "Kenrich Williams",
+        "number": "34",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "210"
+      },
+      {
+        "player_id": 1642260,
+        "player_name": "Nikola Topić",
+        "number": "44",
+        "position": "G",
+        "height": "6-6",
+        "weight": "200"
+      },
+      {
+        "player_id": 1628392,
+        "player_name": "Isaiah Hartenstein",
+        "number": "55",
+        "position": "C-F",
+        "height": "7-0",
+        "weight": "250"
+      }
+    ],
+    "ORL": [
+      {
+        "player_id": 1631457,
+        "player_name": "Alex Morales",
+        "number": "None",
+        "position": "G",
+        "height": "6-6",
+        "weight": "210"
+      },
+      {
+        "player_id": 1641710,
+        "player_name": "Anthony Black",
+        "number": "0",
+        "position": "G",
+        "height": "6-7",
+        "weight": "200"
+      },
+      {
+        "player_id": 1628371,
+        "player_name": "Jonathan Isaac",
+        "number": "1",
+        "position": "F",
+        "height": "6-10",
+        "weight": "230"
+      },
+      {
+        "player_id": 1628975,
+        "player_name": "Jevon Carter",
+        "number": "2",
+        "position": "G",
+        "height": "6-0",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630217,
+        "player_name": "Desmond Bane",
+        "number": "3",
+        "position": "G",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630591,
+        "player_name": "Jalen Suggs",
+        "number": "4",
+        "position": "G",
+        "height": "6-5",
+        "weight": "205"
+      },
+      {
+        "player_id": 1631094,
+        "player_name": "Paolo Banchero",
+        "number": "5",
+        "position": "F",
+        "height": "6-10",
+        "weight": "250"
+      },
+      {
+        "player_id": 1631288,
+        "player_name": "Jamal Cain",
+        "number": "8",
+        "position": "F",
+        "height": "6-7",
+        "weight": "191"
+      },
+      {
+        "player_id": 1642859,
+        "player_name": "Jase Richardson",
+        "number": "11",
+        "position": "G",
+        "height": "6-1",
+        "weight": "180"
+      },
+      {
+        "player_id": 1641724,
+        "player_name": "Jett Howard",
+        "number": "13",
+        "position": "G",
+        "height": "6-8",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630658,
+        "player_name": "Colin Castleton",
+        "number": "14",
+        "position": "C",
+        "height": "6-10",
+        "weight": "250"
+      },
+      {
+        "player_id": 1629021,
+        "player_name": "Moritz Wagner",
+        "number": "21",
+        "position": "F-C",
+        "height": "6-11",
+        "weight": "245"
+      },
+      {
+        "player_id": 1630532,
+        "player_name": "Franz Wagner",
+        "number": "22",
+        "position": "F",
+        "height": "6-10",
+        "weight": "220"
+      },
+      {
+        "player_id": 1641783,
+        "player_name": "Tristan da Silva",
+        "number": "23",
+        "position": "F",
+        "height": "6-8",
+        "weight": "217"
+      },
+      {
+        "player_id": 1628976,
+        "player_name": "Wendell Carter Jr.",
+        "number": "34",
+        "position": "C-F",
+        "height": "6-10",
+        "weight": "270"
+      },
+      {
+        "player_id": 1629048,
+        "player_name": "Goga Bitadze",
+        "number": "35",
+        "position": "C-F",
+        "height": "6-11",
+        "weight": "250"
+      },
+      {
+        "player_id": 1642869,
+        "player_name": "Noah Penda",
+        "number": "93",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "215"
+      }
+    ],
+    "PHI": [
+      {
+        "player_id": 1630178,
+        "player_name": "Tyrese Maxey",
+        "number": "0",
+        "position": "G",
+        "height": "6-2",
+        "weight": "200"
+      },
+      {
+        "player_id": 203083,
+        "player_name": "Andre Drummond",
+        "number": "1",
+        "position": "C",
+        "height": "6-11",
+        "weight": "279"
+      },
+      {
+        "player_id": 1629656,
+        "player_name": "Quentin Grimes",
+        "number": "5",
+        "position": "G",
+        "height": "6-5",
+        "weight": "207"
+      },
+      {
+        "player_id": 200768,
+        "player_name": "Kyle Lowry",
+        "number": "7",
+        "position": "G",
+        "height": "6-0",
+        "weight": "196"
+      },
+      {
+        "player_id": 202331,
+        "player_name": "Paul George",
+        "number": "8",
+        "position": "F",
+        "height": "6-8",
+        "weight": "230"
+      },
+      {
+        "player_id": 1626162,
+        "player_name": "Kelly Oubre Jr.",
+        "number": "9",
+        "position": "F-G",
+        "height": "6-8",
+        "weight": "210"
+      },
+      {
+        "player_id": 1642348,
+        "player_name": "Justin Edwards",
+        "number": "11",
+        "position": "F",
+        "height": "6-7",
+        "weight": "217"
+      },
+      {
+        "player_id": 1630570,
+        "player_name": "Trendon Watford",
+        "number": "12",
+        "position": "G-F",
+        "height": "6-8",
+        "weight": "245"
+      },
+      {
+        "player_id": 1631207,
+        "player_name": "Dalen Terry",
+        "number": "14",
+        "position": "F",
+        "height": "6-6",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630699,
+        "player_name": "MarJon Beauchamp",
+        "number": "16",
+        "position": "F",
+        "height": "6-7",
+        "weight": "199"
+      },
+      {
+        "player_id": 203954,
+        "player_name": "Joel Embiid",
+        "number": "21",
+        "position": "C-F",
+        "height": "7-0",
+        "weight": "270"
+      },
+      {
+        "player_id": 1641780,
+        "player_name": "Johni Broome",
+        "number": "22",
+        "position": "F",
+        "height": "6-9",
+        "weight": "244"
+      },
+      {
+        "player_id": 1631213,
+        "player_name": "Tyrese Martin",
+        "number": "23",
+        "position": "F",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1631230,
+        "player_name": "Dominick Barlow",
+        "number": "25",
+        "position": "F",
+        "height": "6-9",
+        "weight": "224"
+      },
+      {
+        "player_id": 1641737,
+        "player_name": "Adem Bona",
+        "number": "30",
+        "position": "F",
+        "height": "6-10",
+        "weight": "235"
+      },
+      {
+        "player_id": 1631133,
+        "player_name": "Jabari Walker",
+        "number": "33",
+        "position": "F",
+        "height": "6-7",
+        "weight": "237"
+      },
+      {
+        "player_id": 1642845,
+        "player_name": "VJ Edgecombe",
+        "number": "77",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      }
+    ],
+    "PHX": [
+      {
+        "player_id": 1626220,
+        "player_name": "Royce O'Neale",
+        "number": "00",
+        "position": "F",
+        "height": "6-6",
+        "weight": "226"
+      },
+      {
+        "player_id": 1642346,
+        "player_name": "Ryan Dunn",
+        "number": "0",
+        "position": "F",
+        "height": "6-7",
+        "weight": "216"
+      },
+      {
+        "player_id": 1626164,
+        "player_name": "Devin Booker",
+        "number": "1",
+        "position": "G",
+        "height": "6-5",
+        "weight": "206"
+      },
+      {
+        "player_id": 1629599,
+        "player_name": "Amir Coffey",
+        "number": "2",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "210"
+      },
+      {
+        "player_id": 1628415,
+        "player_name": "Dillon Brooks",
+        "number": "3",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630224,
+        "player_name": "Jalen Green",
+        "number": "4",
+        "position": "G",
+        "height": "6-4",
+        "weight": "186"
+      },
+      {
+        "player_id": 1629312,
+        "player_name": "Haywood Highsmith",
+        "number": "7",
+        "position": "F",
+        "height": "6-5",
+        "weight": "220"
+      },
+      {
+        "player_id": 1628960,
+        "player_name": "Grayson Allen",
+        "number": "8",
+        "position": "G",
+        "height": "6-3",
+        "weight": "198"
+      },
+      {
+        "player_id": 1642863,
+        "player_name": "Khaman Maluach",
+        "number": "10",
+        "position": "C",
+        "height": "7-1",
+        "weight": "250"
+      },
+      {
+        "player_id": 1642345,
+        "player_name": "Oso Ighodaro",
+        "number": "11",
+        "position": "F",
+        "height": "6-11",
+        "weight": "235"
+      },
+      {
+        "player_id": 1631221,
+        "player_name": "Collin Gillespie",
+        "number": "12",
+        "position": "G",
+        "height": "6-1",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642886,
+        "player_name": "Koby Brea",
+        "number": "14",
+        "position": "G",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1631109,
+        "player_name": "Mark Williams",
+        "number": "15",
+        "position": "C",
+        "height": "7-1",
+        "weight": "240"
+      },
+      {
+        "player_id": 1631123,
+        "player_name": "Jamaree Bouyea",
+        "number": "17",
+        "position": "G",
+        "height": "6-2",
+        "weight": "180"
+      },
+      {
+        "player_id": 1630587,
+        "player_name": "Isaiah Livers",
+        "number": "18",
+        "position": "F",
+        "height": "6-6",
+        "weight": "232"
+      },
+      {
+        "player_id": 1642853,
+        "player_name": "Rasheer Fleming",
+        "number": "20",
+        "position": "F",
+        "height": "6-9",
+        "weight": "240"
+      },
+      {
+        "player_id": 1643047,
+        "player_name": "CJ Huntley",
+        "number": "22",
+        "position": "F",
+        "height": "6-11",
+        "weight": "230"
+      },
+      {
+        "player_id": 1630692,
+        "player_name": "Jordan Goodwin",
+        "number": "23",
+        "position": "G",
+        "height": "6-3",
+        "weight": "215"
+      }
+    ],
+    "POR": [
+      {
+        "player_id": 1643257,
+        "player_name": "Jayson Kent",
+        "number": "None",
+        "position": "F",
+        "height": "6-8",
+        "weight": "215"
+      },
+      {
+        "player_id": 1630703,
+        "player_name": "Scoot Henderson",
+        "number": "00",
+        "position": "G",
+        "height": "6-3",
+        "weight": "207"
+      },
+      {
+        "player_id": 203081,
+        "player_name": "Damian Lillard",
+        "number": "0",
+        "position": "G",
+        "height": "6-2",
+        "weight": "200"
+      },
+      {
+        "player_id": 1631104,
+        "player_name": "Blake Wesley",
+        "number": "1",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      },
+      {
+        "player_id": 1631126,
+        "player_name": "Caleb Love",
+        "number": "2",
+        "position": "G",
+        "height": "6-3",
+        "weight": "212"
+      },
+      {
+        "player_id": 1642959,
+        "player_name": "Chris Youngblood",
+        "number": "3",
+        "position": "G",
+        "height": "6-4",
+        "weight": "None"
+      },
+      {
+        "player_id": 1629680,
+        "player_name": "Matisse Thybulle",
+        "number": "4",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "202"
+      },
+      {
+        "player_id": 201950,
+        "player_name": "Jrue Holiday",
+        "number": "5",
+        "position": "G",
+        "height": "6-4",
+        "weight": "220"
+      },
+      {
+        "player_id": 1630166,
+        "player_name": "Deni Avdija",
+        "number": "8",
+        "position": "F",
+        "height": "6-8",
+        "weight": "228"
+      },
+      {
+        "player_id": 203924,
+        "player_name": "Jerami Grant",
+        "number": "9",
+        "position": "F",
+        "height": "6-7",
+        "weight": "213"
+      },
+      {
+        "player_id": 1642905,
+        "player_name": "Yang Hansen",
+        "number": "16",
+        "position": "C",
+        "height": "7-1",
+        "weight": "270"
+      },
+      {
+        "player_id": 1631101,
+        "player_name": "Shaedon Sharpe",
+        "number": "17",
+        "position": "G",
+        "height": "6-5",
+        "weight": "210"
+      },
+      {
+        "player_id": 1642270,
+        "player_name": "Donovan Clingan",
+        "number": "23",
+        "position": "C",
+        "height": "7-2",
+        "weight": "280"
+      },
+      {
+        "player_id": 1631200,
+        "player_name": "Kris Murray",
+        "number": "24",
+        "position": "F",
+        "height": "6-8",
+        "weight": "218"
+      },
+      {
+        "player_id": 1630249,
+        "player_name": "Vít Krejčí",
+        "number": "27",
+        "position": "G",
+        "height": "6-8",
+        "weight": "195"
+      },
+      {
+        "player_id": 1641739,
+        "player_name": "Toumani Camara",
+        "number": "33",
+        "position": "F",
+        "height": "6-7",
+        "weight": "230"
+      },
+      {
+        "player_id": 1629057,
+        "player_name": "Robert Williams III",
+        "number": "35",
+        "position": "C-F",
+        "height": "6-9",
+        "weight": "249"
+      },
+      {
+        "player_id": 1631321,
+        "player_name": "Sidy Cissoko",
+        "number": "91",
+        "position": "G",
+        "height": "6-6",
+        "weight": "220"
+      }
+    ],
+    "SAC": [
+      {
+        "player_id": 1628370,
+        "player_name": "Malik Monk",
+        "number": "0",
+        "position": "G",
+        "height": "6-3",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642363,
+        "player_name": "Nique Clifford",
+        "number": "5",
+        "position": "G",
+        "height": "6-5",
+        "weight": "175"
+      },
+      {
+        "player_id": 1630165,
+        "player_name": "Killian Hayes",
+        "number": "7",
+        "position": "G",
+        "height": "6-4",
+        "weight": "195"
+      },
+      {
+        "player_id": 203926,
+        "player_name": "Doug McDermott",
+        "number": "7",
+        "position": "F",
+        "height": "6-7",
+        "weight": "225"
+      },
+      {
+        "player_id": 203897,
+        "player_name": "Zach LaVine",
+        "number": "8",
+        "position": "G",
+        "height": "6-5",
+        "weight": "200"
+      },
+      {
+        "player_id": 1630173,
+        "player_name": "Precious Achiuwa",
+        "number": "9",
+        "position": "F",
+        "height": "6-8",
+        "weight": "243"
+      },
+      {
+        "player_id": 201942,
+        "player_name": "DeMar DeRozan",
+        "number": "10",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1627734,
+        "player_name": "Domantas Sabonis",
+        "number": "11",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "240"
+      },
+      {
+        "player_id": 1631099,
+        "player_name": "Keegan Murray",
+        "number": "13",
+        "position": "F",
+        "height": "6-8",
+        "weight": "225"
+      },
+      {
+        "player_id": 1629631,
+        "player_name": "De'Andre Hunter",
+        "number": "15",
+        "position": "F-G",
+        "height": "6-7",
+        "weight": "221"
+      },
+      {
+        "player_id": 201566,
+        "player_name": "Russell Westbrook",
+        "number": "18",
+        "position": "G",
+        "height": "6-4",
+        "weight": "200"
+      },
+      {
+        "player_id": 1629234,
+        "player_name": "Drew Eubanks",
+        "number": "19",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "245"
+      },
+      {
+        "player_id": 1642269,
+        "player_name": "Devin Carter",
+        "number": "22",
+        "position": "G",
+        "height": "6-2",
+        "weight": "195"
+      },
+      {
+        "player_id": 1631116,
+        "player_name": "Patrick Baldwin Jr.",
+        "number": "23",
+        "position": "F",
+        "height": "7-0",
+        "weight": "220"
+      },
+      {
+        "player_id": 1641815,
+        "player_name": "Isaiah Stevens",
+        "number": "24",
+        "position": "G",
+        "height": "5-11",
+        "weight": "185"
+      },
+      {
+        "player_id": 1631342,
+        "player_name": "Daeqwon Plowden",
+        "number": "29",
+        "position": "G-F",
+        "height": "6-4",
+        "weight": "216"
+      },
+      {
+        "player_id": 1642928,
+        "player_name": "Dylan Cardwell",
+        "number": "32",
+        "position": "C",
+        "height": "6-10",
+        "weight": "255"
+      },
+      {
+        "player_id": 1642875,
+        "player_name": "Maxime Raynaud",
+        "number": "42",
+        "position": "C",
+        "height": "7-1",
+        "weight": "250"
+      }
+    ],
+    "SAS": [
+      {
+        "player_id": 1629162,
+        "player_name": "Jordan McLaughlin",
+        "number": "0",
+        "position": "G",
+        "height": "5-11",
+        "weight": "185"
+      },
+      {
+        "player_id": 1641705,
+        "player_name": "Victor Wembanyama",
+        "number": "1",
+        "position": "F-C",
+        "height": "7-4",
+        "weight": "235"
+      },
+      {
+        "player_id": 1642844,
+        "player_name": "Dylan Harper",
+        "number": "2",
+        "position": "G",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 1629640,
+        "player_name": "Keldon Johnson",
+        "number": "3",
+        "position": "F-G",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1628368,
+        "player_name": "De'Aaron Fox",
+        "number": "4",
+        "position": "G",
+        "height": "6-3",
+        "weight": "185"
+      },
+      {
+        "player_id": 1642264,
+        "player_name": "Stephon Castle",
+        "number": "5",
+        "position": "G",
+        "height": "6-6",
+        "weight": "215"
+      },
+      {
+        "player_id": 1628436,
+        "player_name": "Luke Kornet",
+        "number": "7",
+        "position": "C-F",
+        "height": "7-1",
+        "weight": "250"
+      },
+      {
+        "player_id": 203482,
+        "player_name": "Kelly Olynyk",
+        "number": "8",
+        "position": "F-C",
+        "height": "7-0",
+        "weight": "240"
+      },
+      {
+        "player_id": 1642868,
+        "player_name": "Carter Bryant",
+        "number": "11",
+        "position": "F",
+        "height": "6-6",
+        "weight": "220"
+      },
+      {
+        "player_id": 1641801,
+        "player_name": "Emanuel Miller",
+        "number": "14",
+        "position": "F",
+        "height": "6-5",
+        "weight": "215"
+      },
+      {
+        "player_id": 202687,
+        "player_name": "Bismack Biyombo",
+        "number": "18",
+        "position": "C",
+        "height": "6-8",
+        "weight": "255"
+      },
+      {
+        "player_id": 1630170,
+        "player_name": "Devin Vassell",
+        "number": "24",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642357,
+        "player_name": "David Jones Garcia",
+        "number": "25",
+        "position": "G",
+        "height": "6-4",
+        "weight": "210"
+      },
+      {
+        "player_id": 1630577,
+        "player_name": "Julian Champagnie",
+        "number": "30",
+        "position": "F",
+        "height": "6-7",
+        "weight": "217"
+      },
+      {
+        "player_id": 203084,
+        "player_name": "Harrison Barnes",
+        "number": "40",
+        "position": "F",
+        "height": "6-7",
+        "weight": "225"
+      },
+      {
+        "player_id": 1630322,
+        "player_name": "Lindy Waters III",
+        "number": "43",
+        "position": "F",
+        "height": "6-5",
+        "weight": "210"
+      },
+      {
+        "player_id": 203486,
+        "player_name": "Mason Plumlee",
+        "number": "45",
+        "position": "F-C",
+        "height": "7-0",
+        "weight": "254"
+      },
+      {
+        "player_id": 1631127,
+        "player_name": "Harrison Ingram",
+        "number": "55",
+        "position": "F",
+        "height": "6-5",
+        "weight": "230"
+      }
+    ],
+    "TOR": [
+      {
+        "player_id": 1630639,
+        "player_name": "A.J. Lawson",
+        "number": "0",
+        "position": "G",
+        "height": "6-6",
+        "weight": "179"
+      },
+      {
+        "player_id": 1641711,
+        "player_name": "Gradey Dick",
+        "number": "1",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642367,
+        "player_name": "Jonathan Mogbo",
+        "number": "2",
+        "position": "F",
+        "height": "6-9",
+        "weight": "225"
+      },
+      {
+        "player_id": 1627742,
+        "player_name": "Brandon Ingram",
+        "number": "3",
+        "position": "F",
+        "height": "6-8",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630567,
+        "player_name": "Scottie Barnes",
+        "number": "4",
+        "position": "F-G",
+        "height": "6-8",
+        "weight": "237"
+      },
+      {
+        "player_id": 1630193,
+        "player_name": "Immanuel Quickley",
+        "number": "5",
+        "position": "G",
+        "height": "6-2",
+        "weight": "190"
+      },
+      {
+        "player_id": 1629628,
+        "player_name": "RJ Barrett",
+        "number": "9",
+        "position": "F-G",
+        "height": "6-6",
+        "weight": "214"
+      },
+      {
+        "player_id": 1642867,
+        "player_name": "Collin Murray-Boyles",
+        "number": "12",
+        "position": "F",
+        "height": "6-7",
+        "weight": "245"
+      },
+      {
+        "player_id": 1642266,
+        "player_name": "Ja'Kobe Walter",
+        "number": "14",
+        "position": "G",
+        "height": "6-4",
+        "weight": "180"
+      },
+      {
+        "player_id": 202066,
+        "player_name": "Garrett Temple",
+        "number": "17",
+        "position": "G-F",
+        "height": "6-5",
+        "weight": "195"
+      },
+      {
+        "player_id": 1627751,
+        "player_name": "Jakob Poeltl",
+        "number": "19",
+        "position": "C",
+        "height": "7-0",
+        "weight": "253"
+      },
+      {
+        "player_id": 1642347,
+        "player_name": "Jamal Shead",
+        "number": "23",
+        "position": "G",
+        "height": "6-1",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642935,
+        "player_name": "Chucky Hepburn",
+        "number": "24",
+        "position": "G",
+        "height": "6-0",
+        "weight": "190"
+      },
+      {
+        "player_id": 1631218,
+        "player_name": "Trayce Jackson-Davis",
+        "number": "32",
+        "position": "F",
+        "height": "6-9",
+        "weight": "245"
+      },
+      {
+        "player_id": 1630572,
+        "player_name": "Sandro Mamukelashvili",
+        "number": "54",
+        "position": "F-C",
+        "height": "6-9",
+        "weight": "240"
+      },
+      {
+        "player_id": 1642918,
+        "player_name": "Alijah Martin",
+        "number": "55",
+        "position": "G",
+        "height": "6-2",
+        "weight": "210"
+      },
+      {
+        "player_id": 1642419,
+        "player_name": "Jamison Battle",
+        "number": "77",
+        "position": "F",
+        "height": "6-7",
+        "weight": "220"
+      }
+    ],
+    "UTA": [
+      {
+        "player_id": 1643060,
+        "player_name": "Hayden Gray",
+        "number": "None",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      },
+      {
+        "player_id": 1642396,
+        "player_name": "Blake Hinson",
+        "number": "2",
+        "position": "F",
+        "height": "6-8",
+        "weight": "230"
+      },
+      {
+        "player_id": 1641718,
+        "player_name": "Keyonte George",
+        "number": "3",
+        "position": "G",
+        "height": "6-4",
+        "weight": "185"
+      },
+      {
+        "player_id": 1642262,
+        "player_name": "Cody Williams",
+        "number": "5",
+        "position": "F",
+        "height": "6-8",
+        "weight": "190"
+      },
+      {
+        "player_id": 1642268,
+        "player_name": "Isaiah Collier",
+        "number": "8",
+        "position": "G",
+        "height": "6-4",
+        "weight": "210"
+      },
+      {
+        "player_id": 1629004,
+        "player_name": "Svi Mykhailiuk",
+        "number": "10",
+        "position": "G-F",
+        "height": "6-7",
+        "weight": "205"
+      },
+      {
+        "player_id": 1641989,
+        "player_name": "Elijah Harkless",
+        "number": "16",
+        "position": "G",
+        "height": "6-3",
+        "weight": "195"
+      },
+      {
+        "player_id": 1642846,
+        "player_name": "Ace Bailey",
+        "number": "19",
+        "position": "F",
+        "height": "6-9",
+        "weight": "200"
+      },
+      {
+        "player_id": 1628991,
+        "player_name": "Jaren Jackson Jr.",
+        "number": "20",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "242"
+      },
+      {
+        "player_id": 1643016,
+        "player_name": "Bez Mbeng",
+        "number": "21",
+        "position": "G",
+        "height": "6-4",
+        "weight": "185"
+      },
+      {
+        "player_id": 1642271,
+        "player_name": "Kyle Filipowski",
+        "number": "22",
+        "position": "C",
+        "height": "6-11",
+        "weight": "250"
+      },
+      {
+        "player_id": 1628374,
+        "player_name": "Lauri Markkanen",
+        "number": "23",
+        "position": "F-C",
+        "height": "7-1",
+        "weight": "240"
+      },
+      {
+        "player_id": 1631117,
+        "player_name": "Walker Kessler",
+        "number": "24",
+        "position": "C",
+        "height": "7-2",
+        "weight": "245"
+      },
+      {
+        "player_id": 1641729,
+        "player_name": "Brice Sensabaugh",
+        "number": "28",
+        "position": "F",
+        "height": "6-6",
+        "weight": "235"
+      },
+      {
+        "player_id": 203994,
+        "player_name": "Jusuf Nurkić",
+        "number": "30",
+        "position": "C",
+        "height": "6-11",
+        "weight": "290"
+      },
+      {
+        "player_id": 1631131,
+        "player_name": "Oscar Tshiebwe",
+        "number": "34",
+        "position": "F-C",
+        "height": "6-8",
+        "weight": "255"
+      },
+      {
+        "player_id": 201567,
+        "player_name": "Kevin Love",
+        "number": "42",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "251"
+      },
+      {
+        "player_id": 1629723,
+        "player_name": "John Konchar",
+        "number": "55",
+        "position": "G",
+        "height": "6-5",
+        "weight": "210"
+      }
+    ],
+    "WAS": [
+      {
+        "player_id": 1642882,
+        "player_name": "Julian Reese",
+        "number": "None",
+        "position": "F",
+        "height": "6-9",
+        "weight": "230"
+      },
+      {
+        "player_id": 1641731,
+        "player_name": "Bilal Coulibaly",
+        "number": "0",
+        "position": "G",
+        "height": "6-7",
+        "weight": "195"
+      },
+      {
+        "player_id": 1641774,
+        "player_name": "Tristan Vukcevic",
+        "number": "00",
+        "position": "F",
+        "height": "7-0",
+        "weight": "220"
+      },
+      {
+        "player_id": 1641715,
+        "player_name": "Cam Whitmore",
+        "number": "1",
+        "position": "F",
+        "height": "6-6",
+        "weight": "230"
+      },
+      {
+        "player_id": 1629027,
+        "player_name": "Trae Young",
+        "number": "3",
+        "position": "G",
+        "height": "6-2",
+        "weight": "164"
+      },
+      {
+        "player_id": 1626156,
+        "player_name": "D'Angelo Russell",
+        "number": "5",
+        "position": "G",
+        "height": "6-3",
+        "weight": "193"
+      },
+      {
+        "player_id": 1642364,
+        "player_name": "Jamir Watkins",
+        "number": "5",
+        "position": "F",
+        "height": "6-6",
+        "weight": "210"
+      },
+      {
+        "player_id": 1642267,
+        "player_name": "Bub Carrington",
+        "number": "7",
+        "position": "G",
+        "height": "6-4",
+        "weight": "190"
+      },
+      {
+        "player_id": 1630702,
+        "player_name": "Jaden Hardy",
+        "number": "8",
+        "position": "G",
+        "height": "6-3",
+        "weight": "198"
+      },
+      {
+        "player_id": 1630551,
+        "player_name": "Justin Champagnie",
+        "number": "9",
+        "position": "G-F",
+        "height": "6-6",
+        "weight": "206"
+      },
+      {
+        "player_id": 1642848,
+        "player_name": "Tre Johnson",
+        "number": "12",
+        "position": "G",
+        "height": "6-5",
+        "weight": "190"
+      },
+      {
+        "player_id": 1641778,
+        "player_name": "Leaky Black",
+        "number": "12",
+        "position": "F",
+        "height": "6-6",
+        "weight": "209"
+      },
+      {
+        "player_id": 1630536,
+        "player_name": "Sharife Cooper",
+        "number": "13",
+        "position": "G",
+        "height": "6-0",
+        "weight": "176"
+      },
+      {
+        "player_id": 1630264,
+        "player_name": "Anthony Gill",
+        "number": "16",
+        "position": "F",
+        "height": "6-7",
+        "weight": "230"
+      },
+      {
+        "player_id": 1642273,
+        "player_name": "Kyshawn George",
+        "number": "18",
+        "position": "F",
+        "height": "6-8",
+        "weight": "200"
+      },
+      {
+        "player_id": 1642259,
+        "player_name": "Alex Sarr",
+        "number": "20",
+        "position": "C",
+        "height": "7-0",
+        "weight": "205"
+      },
+      {
+        "player_id": 203076,
+        "player_name": "Anthony Davis",
+        "number": "23",
+        "position": "F-C",
+        "height": "6-10",
+        "weight": "253"
+      },
+      {
+        "player_id": 1642860,
+        "player_name": "Will Riley",
+        "number": "27",
+        "position": "F",
+        "height": "6-9",
+        "weight": "180"
+      }
+    ]
+  }
+}
