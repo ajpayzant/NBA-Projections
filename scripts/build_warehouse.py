@@ -296,11 +296,12 @@ def fetch_upcoming_games(days_ahead: int = 14) -> pd.DataFrame:
     today = dt.date.today()
     for delta in range(days_ahead):
         d = today + dt.timedelta(days=delta)
+        # Only 2 retries for schedule — 500 means server down, no point hammering
         data = _fetch_stats_json("scoreboardv2", {
             "GameDate":  d.strftime("%Y-%m-%d"),
             "DayOffset": "0",
             "LeagueID":  "00",
-        })
+        }, max_retries=2, base_sleep=3.0)
         if data is None:
             continue
         try:
@@ -808,11 +809,27 @@ def main(full_rebuild: bool = False):
     player_info_df = fetch_player_info(player_ids, pos_cache_path)
 
     # ── Schedule ──────────────────────────────────────────────────────────────
-    logger.info("Fetching upcoming schedule...")
-    schedule_df = fetch_upcoming_games(days_ahead=14)
-    if not schedule_df.empty:
-        schedule_df.to_parquet(RAW_DIR / "schedule.parquet", index=False)
-    logger.info("Schedule: %d upcoming games", len(schedule_df))
+    # Load from cache if it exists; refresh from API but skip gracefully if down
+    schedule_cache = RAW_DIR / "schedule.parquet"
+    schedule_df = pd.DataFrame()
+    if schedule_cache.exists():
+        try:
+            schedule_df = pd.read_parquet(schedule_cache)
+            logger.info("Loaded cached schedule: %d games", len(schedule_df))
+        except Exception:
+            pass
+
+    logger.info("Fetching upcoming schedule (max 3 retries, skip if unavailable)...")
+    try:
+        fresh = fetch_upcoming_games(days_ahead=14)
+        if not fresh.empty:
+            schedule_df = fresh
+            schedule_df.to_parquet(schedule_cache, index=False)
+            logger.info("Schedule updated: %d upcoming games", len(schedule_df))
+    except Exception as e:
+        logger.warning("Schedule fetch failed (%s) — using cached or empty schedule", e)
+
+    logger.info("Schedule: %d games available", len(schedule_df))
 
     # ── Feature engineering ───────────────────────────────────────────────────
     logger.info("Building team features...")
