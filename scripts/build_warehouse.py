@@ -459,11 +459,38 @@ def build_team_features(team_df: pd.DataFrame) -> pd.DataFrame:
         on=["GAME_ID", "TEAM_ABBREVIATION"], how="left"
     )
 
+    # Offensive and Defensive Ratings (pts per 100 possessions)
+    # These are the gold standard for team quality measurement in NBA analytics
+    if "POSS" in df.columns:
+        df["OFF_RTG"] = np.where(df["POSS"] > 0, (df["TEAM_PTS"] / df["POSS"]) * 100.0, np.nan)
+        # DEF_RTG requires opponent pts — will be filled after opponent merge below
+        # For now compute from opponent in the merge
+    else:
+        df["OFF_RTG"] = np.nan
+
+    # Opponent game stats for DEF_RTG — merge opponent scoring
+    if "OPP_TEAM_ABBREVIATION" in df.columns:
+        opp_pts = df[["GAME_ID","TEAM_ABBREVIATION","TEAM_PTS","POSS"]].rename(
+            columns={"TEAM_ABBREVIATION":"OPP_TEAM_ABBREVIATION",
+                     "TEAM_PTS":"OPP_PTS_SCORED","POSS":"OPP_POSS"}
+        )
+        df = df.merge(opp_pts, on=["GAME_ID","OPP_TEAM_ABBREVIATION"], how="left")
+        df["DEF_RTG"] = np.where(
+            df["POSS"].fillna(0) > 0,
+            (df["OPP_PTS_SCORED"].fillna(df["TEAM_PTS"]) / df["POSS"]) * 100.0,
+            np.nan
+        )
+        df["NET_RTG"] = df["OFF_RTG"] - df["DEF_RTG"]
+    else:
+        df["DEF_RTG"] = np.nan
+        df["NET_RTG"] = np.nan
+
     # Rolling EWM and window features (leakage-safe)
     HL = 8   # EWM half-life in games
     roll_stats = ["TEAM_PTS", "TEAM_REB", "TEAM_AST", "TEAM_TOV",
                   "TEAM_FG_PCT", "TEAM_FG3_PCT", "TEAM_EFG",
-                  "TEAM_TOV_RATE", "PACE", "POSS"]
+                  "TEAM_TOV_RATE", "PACE", "POSS",
+                  "OFF_RTG", "DEF_RTG", "NET_RTG"]   # ← Added
     roll_stats = [c for c in roll_stats if c in df.columns]
 
     df = df.sort_values(["TEAM_ABBREVIATION", "SEASON", "GAME_DATE"]).reset_index(drop=True)

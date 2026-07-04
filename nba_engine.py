@@ -660,28 +660,14 @@ class NBAPlayerModel:
         tov_pm  = self._get_rate(ratings, "TOV_PM_EWM",  pos, "tov_pm")
         fg3m_pm = self._get_rate(ratings, "FG3M_PM_EWM", pos, "fg3m_pm")
 
-        # ── USG% into rate projection ─────────────────────────────────────────
-        # Research: USG_PCT_EWM has 0.582 correlation with actual PTS and 0.169
-        # GBM importance. Blend USG-scaled rate with EWM rate for pts/ast/tov.
-        # USG directly predicts pts/ast/tov because it measures offensive involvement.
-        usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
-        lg_usg  = 18.0
-        if usg_ewm > 0 and gp >= 10:
-            # USG-implied pts rate: players at league-average USG score at league rate
-            # Scaling: 1% more USG → ~proportional scoring rate increase
-            usg_scale = float(np.clip(usg_ewm / lg_usg, 0.5, 2.5))
-            lg_pts_pm  = LG_PTS / (5 * LG_MIN_PER_PLAYER)
-            usg_pts_pm = lg_pts_pm * usg_scale
-            # Blend: 70% own EWM rate + 30% USG-implied rate
-            pts_pm  = 0.70 * pts_pm  + 0.30 * usg_pts_pm
-
-            lg_ast_pm  = LG_AST / (5 * LG_MIN_PER_PLAYER)
-            usg_ast_pm = lg_ast_pm * usg_scale * 0.6  # ast scales less than pts with USG
-            ast_pm  = 0.70 * ast_pm  + 0.30 * usg_ast_pm
-
-            lg_tov_pm  = LG_TOV / (5 * LG_MIN_PER_PLAYER)
-            usg_tov_pm = lg_tov_pm * usg_scale
-            tov_pm  = 0.70 * tov_pm  + 0.30 * usg_tov_pm
+        # ── USG% as a rate confidence signal (not a rate override) ──────────────
+        # Backtest showed that blending USG-implied rate into PTS/min massively
+        # overcorrects for stars (USG>28% MAE went from 6.4 to 15.9).
+        # The reason: USG correlates with PTS mainly BECAUSE high-USG players
+        # play more minutes — which is already captured by the USG minutes adjustment.
+        # The per-minute rate should stay as the player's own EWM history.
+        # USG is retained only for the minutes adjustment above (correct use).
+        # No rate override here.
 
         # ── Opponent defensive context ────────────────────────────────────────
         # Apply position-specific opponent defense adjustment.
