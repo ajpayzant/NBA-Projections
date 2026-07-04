@@ -16,8 +16,7 @@ import streamlit as st
 from _engine_state import (
     SHARED_CSS, get_engine, init_session, team_name, team_color,
     get_depth_chart, set_player_override, set_player_rating,
-    render_update_btn, build_player_overrides, run_projection,
-    pos_badge, PLAYER_RATING_DEFS, _autosave,
+    render_update_btn, run_projection, pos_badge, _autosave,
 )
 
 st.set_page_config(page_title="Depth Charts · NBA", page_icon="🏀", layout="wide")
@@ -25,11 +24,16 @@ init_session()
 st.markdown(SHARED_CSS, unsafe_allow_html=True)
 st.markdown("""
 <style>
-.inj-healthy    { color: #34d399; font-weight: 700; }
-.inj-questionable { color: #fbbf24; font-weight: 700; }
-.inj-doubtful   { color: #f97316; font-weight: 700; }
-.inj-out        { color: #ef4444; font-weight: 700; }
-.modified-badge { font-size:.70rem; color:#fbbf24; font-weight:700; }
+.inj-healthy     { color:#34d399;font-weight:700; }
+.inj-questionable{ color:#fbbf24;font-weight:700; }
+.inj-doubtful    { color:#f97316;font-weight:700; }
+.inj-out         { color:#ef4444;font-weight:700; }
+.starter-badge   { background:#0891b2;color:#fff;border-radius:3px;
+                   padding:1px 5px;font-size:.68rem;font-weight:700; }
+.dc-section      { font-size:.72rem;font-weight:700;letter-spacing:.06em;
+                   text-transform:uppercase;color:#64748b;
+                   border-left:3px solid #334155;background:rgba(51,65,85,.18);
+                   padding:3px 8px;margin:10px 0 4px;border-radius:0 4px 4px 0; }
 </style>""", unsafe_allow_html=True)
 
 engine = get_engine()
@@ -43,38 +47,30 @@ away_id = result.away_team
 game    = st.session_state.get("selected_game", {})
 
 st.title("📋 Depth Charts")
-st.markdown(
-    f"**{team_name(away_id)} @ {team_name(home_id)}** · "
-    f"{str(game.get('game_date',''))[:10]}"
-)
+st.markdown(f"**{team_name(away_id)} @ {team_name(home_id)}** · {str(game.get('game_date',''))[:10]}")
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### Controls")
     render_update_btn(engine, key="dc_upd")
+
     st.markdown("---")
     st.markdown("### Google Sheets")
-    if st.button("🔗 Reshare Sheets", key="dc_reshare", width="stretch",
-                 help="Re-grant service account access if Save to Sheets is failing"):
+    if st.button("🔗 Reshare Sheets", key="dc_reshare", width="stretch"):
         with st.spinner("Resharing..."):
             try:
-                import sys as _sys
-                _sys.path.insert(0, str(_ROOT))
                 from scripts.reshare_sheets import reshare_all, verify_access
                 reshare_all(verbose=False)
                 ok = verify_access(verbose=False)
-                if ok:
-                    st.success("Sheets access restored.")
-                else:
-                    st.error("Reshare ran but access still failing. "
-                             "Reshare manually in Google Drive.")
+                st.success("Access restored." if ok else "Reshare ran — check sheet manually if issues persist.")
             except Exception as _e:
                 st.error(f"Reshare failed: {_e}")
+
     st.markdown("---")
     st.markdown("### Bulk actions")
     bulk_team = st.radio("Team", [team_name(away_id), team_name(home_id)],
                          key="dc_bulk_team", horizontal=True)
-    bulk_abbr = away_id if bulk_team == team_name(away_id) else home_id
+    bulk_abbr    = away_id if bulk_team == team_name(away_id) else home_id
     bulk_players = result.away_players if bulk_abbr == away_id else result.home_players
 
     b1, b2 = st.columns(2)
@@ -87,204 +83,218 @@ with st.sidebar:
     with b2:
         if st.button("Clear overrides", key="dc_clr", width="stretch"):
             st.session_state.depth_charts[bulk_abbr] = {}
-            stale = [k for k in st.session_state
-                     if k.startswith(f"pr_num_{bulk_abbr}_")
-                     or k.startswith(f"inj_{bulk_abbr}_")]
-            for k in stale:
-                del st.session_state[k]
             _autosave()
             st.rerun()
 
 st.markdown("---")
 
-# ── Injury rating labels ──────────────────────────────────────────────────────
-INJ_LABELS = {
-    0.00: ("Healthy",    "inj-healthy"),
-    0.25: ("Questionable (likely)", "inj-questionable"),
-    0.50: ("Questionable (doubtful)", "inj-questionable"),
-    0.75: ("Doubtful",   "inj-doubtful"),
-    1.00: ("Out",        "inj-out"),
-}
-
-def _inj_label(rating: float) -> tuple:
-    r = round(float(rating) * 4) / 4  # snap to 0, 0.25, 0.5, 0.75, 1.0
-    return INJ_LABELS.get(r, ("Unknown", "inj-out"))
+INJ_OPTS = {0.0:"Healthy", 0.25:"Questionable (likely)", 0.50:"Questionable (doubtful)",
+            0.75:"Doubtful", 1.00:"Out"}
 
 
 def _render_team(team_abbr: str, team_nm: str, players):
-    dc = get_depth_chart(team_abbr)
-    c = team_color(team_abbr)
+    dc    = get_depth_chart(team_abbr)
+    color = team_color(team_abbr)
+
     st.markdown(
-        f'<div style="border-left:4px solid {c};padding:4px 12px;margin-bottom:12px;">'
-        f'<span style="font-size:1.05rem;font-weight:700;color:{c};">{team_nm}</span></div>',
-        unsafe_allow_html=True,
+        f'<div style="border-left:4px solid {color};padding:4px 12px;margin-bottom:8px;">'
+        f'<span style="font-size:1.05rem;font-weight:700;color:{color};">{team_nm}</span>'
+        f'<span style="font-size:.75rem;color:#64748b;margin-left:12px;">Click IN/OUT to toggle · adjust minutes inline · set injury status</span>'
+        f'</div>', unsafe_allow_html=True,
     )
 
-    sorted_players = sorted(
-        players,
-        key=lambda p: ({"G": 0, "F": 1, "C": 2, "UNK": 3}.get(p.pos_group, 3),
-                       -p.proj_pts)
-    )
+    # Determine starters: top-5 active by proj_pts (or user-set)
+    active_players = [p for p in players if p.active]
+    inactive_players = [p for p in players if not p.active]
 
-    # Columns: Player | Pos | In/Out | Injury | Min | PTS | REB | AST | PRA | Edit
-    hdr = st.columns([2.8, 0.55, 0.65, 0.75, 0.85, 0.85, 0.85, 0.85, 0.85, 0.7])
-    for col, lbl in zip(hdr, ["Player", "Pos", "In/Out", "Injury", "Min",
-                                "PTS", "REB", "AST", "PRA", ""]):
-        col.markdown(f"<span style='font-size:.73rem;font-weight:700;color:#64748b;'>{lbl}</span>",
-                     unsafe_allow_html=True)
-    st.markdown('<hr style="margin:2px 0 6px;border-color:rgba(148,163,184,.15);">', unsafe_allow_html=True)
+    def _is_starter(p):
+        return bool(dc.get(p.player_id, {}).get("is_starter", False))
 
-    for p in sorted_players:
-        pid       = p.player_id
-        existing  = dc.get(pid, {})
-        is_active = bool(existing.get("active", True))
-        inj_r     = float(existing.get("injury_rating", 0.0))
-        has_ov    = bool(existing.get("rating_overrides") or
-                         existing.get("minutes_override") is not None or
-                         inj_r > 0)
+    user_starters = [p for p in active_players if _is_starter(p)]
+    if len(user_starters) < 5:
+        auto_starters = sorted(
+            [p for p in active_players if not _is_starter(p)],
+            key=lambda x: -x.proj_pts
+        )[:5 - len(user_starters)]
+        starters = user_starters + auto_starters
+    else:
+        starters = user_starters[:5]
+    starter_ids = {p.player_id for p in starters}
 
-        inj_lbl, inj_cls = _inj_label(inj_r)
-        opacity = "" if is_active else "opacity:.35;"
+    bench = [p for p in active_players if p.player_id not in starter_ids]
 
-        c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 = st.columns(
-            [2.8, 0.55, 0.65, 0.75, 0.85, 0.85, 0.85, 0.85, 0.85, 0.7]
-        )
+    for section_label, section_players in [
+        ("Starting Lineup", sorted(starters, key=lambda x: -x.proj_pts)),
+        ("Bench", sorted(bench, key=lambda x: -x.proj_pts)),
+        ("Inactive / Out", sorted(inactive_players, key=lambda x: -x.proj_pts)),
+    ]:
+        if not section_players:
+            continue
 
-        with c1:
-            mod = f' <span class="modified-badge">⚡</span>' if has_ov else ""
-            struck = "text-decoration:line-through;color:#475569;" if not is_active else ""
-            st.markdown(
-                f'<span style="{struck}{opacity}font-size:.88rem;">{p.player_name}</span>{mod}',
-                unsafe_allow_html=True,
-            )
-        with c2:
-            st.markdown(pos_badge(p.pos_group), unsafe_allow_html=True)
+        st.markdown(f'<div class="dc-section">{section_label} ({len(section_players)})</div>',
+                    unsafe_allow_html=True)
 
-        # ── In/Out toggle — single click to activate/deactivate ──────────────
-        with c3:
-            btn_color  = "#16a34a" if is_active else "#dc2626"
-            btn_text   = "IN" if is_active else "OUT"
-            btn_border = f"border:2px solid {btn_color};"
-            btn_bg     = f"background:rgba({('22,163,74' if is_active else '220,38,38')},.15);"
-            st.markdown(
-                f'<div style="padding-top:2px;">',
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                btn_text,
-                key=f"inout_{team_abbr}_{pid}",
-                help="Click to toggle player In/Out of lineup",
-            ):
-                new_active = not is_active
-                set_player_override(team_abbr, pid, "active", new_active)
-                # If setting Out, also set injury_rating to 1.0 visually
-                if not new_active:
-                    set_player_override(team_abbr, pid, "injury_rating", 1.0)
-                    st.session_state[f"inj_{team_abbr}_{pid}"] = 1.0
-                else:
-                    # Restoring — clear Out injury rating
-                    if existing.get("injury_rating", 0.0) >= 1.0:
-                        set_player_override(team_abbr, pid, "injury_rating", 0.0)
-                        st.session_state[f"inj_{team_abbr}_{pid}"] = 0.0
-                st.rerun()
+        # Column headers
+        hdr = st.columns([2.4, 0.5, 0.6, 0.7, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6])
+        for col, lbl in zip(hdr, ["Player","Pos","⭐","In/Out","Min","PTS","REB","AST","PRA","Inj.","Edit"]):
+            col.markdown(f"<span style='font-size:.70rem;font-weight:700;color:#64748b;'>{lbl}</span>",
+                         unsafe_allow_html=True)
+        st.markdown('<hr style="margin:2px 0 4px;border-color:rgba(148,163,184,.12);">', unsafe_allow_html=True)
 
-        with c4:
-            st.markdown(
-                f'<span class="{inj_cls}" style="font-size:.75rem;">'
-                f'{"Out" if not is_active else inj_lbl}</span>',
-                unsafe_allow_html=True,
-            )
-        with c5:
-            st.markdown(
-                f'<span style="{opacity}font-size:.82rem;color:#94a3b8;">'
-                f'{"--" if not is_active else f"{p.proj_min:.1f}"}</span>',
-                unsafe_allow_html=True,
-            )
-        for col, val in [(c6, p.proj_pts), (c7, p.proj_reb), (c8, p.proj_ast), (c9, p.proj_pra)]:
-            color = "#34d399" if val >= 20 else "#94a3b8"
-            col.markdown(
-                f'<span style="{opacity}font-size:.82rem;color:{color};">'
-                f'{"--" if not is_active else f"{val:.1f}"}</span>',
-                unsafe_allow_html=True,
+        for p in section_players:
+            pid       = p.player_id
+            existing  = dc.get(pid, {})
+            is_active = bool(existing.get("active", True))
+            inj_r     = float(existing.get("injury_rating", 0.0))
+            is_strt   = pid in starter_ids
+            has_ov    = bool(existing.get("minutes_override") is not None or
+                             existing.get("rating_overrides") or inj_r > 0)
+            opacity   = "" if is_active else "opacity:.3;"
+            struck    = "text-decoration:line-through;color:#475569;" if not is_active else ""
+
+            c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11 = st.columns(
+                [2.4, 0.5, 0.6, 0.7, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
             )
 
-        with c10:
-            rating_key = f"show_edit_{team_abbr}_{pid}"
-            if rating_key not in st.session_state:
-                st.session_state[rating_key] = False
-            btn_lbl = "⚡ Edit" if has_ov else "Edit"
-            if st.button(btn_lbl, key=f"ebtn_{team_abbr}_{pid}", width="stretch"):
-                st.session_state[rating_key] = not st.session_state[rating_key]
-
-        # ── Edit panel ────────────────────────────────────────────────────────
-        if st.session_state.get(f"show_edit_{team_abbr}_{pid}", False):
-            with st.container():
+            # Player name
+            with c1:
+                mod = ' <span style="color:#fbbf24;font-size:.68rem;">⚡</span>' if has_ov else ""
                 st.markdown(
-                    f'<div style="background:rgba(30,58,95,.25);border-left:3px solid #0891b2;'
-                    f'border-radius:0 6px 6px 0;padding:8px 12px;margin:2px 0 6px;">'
-                    f'<span style="font-size:.75rem;color:#7dd3fc;font-weight:700;">'
-                    f'Adjustments — {p.player_name}</span></div>',
+                    f'<span style="{struck}{opacity}font-size:.85rem;">{p.player_name}</span>{mod}',
                     unsafe_allow_html=True,
                 )
 
-                ep1, ep2 = st.columns(2)
+            # Position
+            with c2:
+                st.markdown(pos_badge(p.pos_group), unsafe_allow_html=True)
 
-                with ep1:
-                    # Injury rating (Active/Inactive handled by In/Out button in row)
-                    inj_key = f"inj_{team_abbr}_{pid}"
-                    if inj_key not in st.session_state:
-                        st.session_state[inj_key] = inj_r
-                    new_inj = st.select_slider(
-                        "Injury rating",
-                        options=[0.0, 0.25, 0.50, 0.75, 1.0],
-                        value=st.session_state[inj_key],
-                        format_func=lambda x: {
-                            0.0: "0.0 — Healthy",
-                            0.25: "0.25 — Questionable (likely)",
-                            0.50: "0.50 — Questionable (doubtful)",
-                            0.75: "0.75 — Doubtful",
-                            1.00: "1.0 — Out",
-                        }[x],
-                        key=inj_key,
-                    )
-                    if abs(new_inj - inj_r) > 0.01:
-                        set_player_override(team_abbr, pid, "injury_rating", new_inj)
+            # Starter toggle
+            with c3:
+                if is_active:
+                    if st.button("⭐" if is_strt else "☆",
+                                 key=f"strt_{team_abbr}_{pid}",
+                                 help="Toggle starter/bench"):
+                        if is_strt:
+                            # Remove from starters — only clear if user explicitly set
+                            if "is_starter" in existing:
+                                del st.session_state.depth_charts[team_abbr][pid]["is_starter"]
+                                _autosave()
+                        else:
+                            set_player_override(team_abbr, pid, "is_starter", True)
+                        st.rerun()
+                else:
+                    st.markdown('<span style="color:#334155;font-size:.8rem;">—</span>', unsafe_allow_html=True)
 
-                with ep2:
-                    # Minutes override
-                    min_ov = existing.get("minutes_override")
-                    min_wk = f"min_ov_{team_abbr}_{pid}"
-                    if min_wk not in st.session_state:
-                        st.session_state[min_wk] = float(min_ov) if min_ov is not None else p.proj_min
+            # In/Out button
+            with c4:
+                btn_lbl  = "IN" if is_active else "OUT"
+                btn_type = "secondary"
+                if st.button(btn_lbl, key=f"inout_{team_abbr}_{pid}",
+                             help="Toggle active/inactive"):
+                    new_active = not is_active
+                    set_player_override(team_abbr, pid, "active", new_active)
+                    if not new_active:
+                        set_player_override(team_abbr, pid, "injury_rating", 1.0)
+                        st.session_state[f"inj_{team_abbr}_{pid}"] = 1.0
+                    else:
+                        if existing.get("injury_rating", 0.0) >= 1.0:
+                            set_player_override(team_abbr, pid, "injury_rating", 0.0)
+                            st.session_state[f"inj_{team_abbr}_{pid}"] = 0.0
+                    # Auto-reproject
+                    if game := st.session_state.get("selected_game"):
+                        run_projection(engine, game)
+                    st.rerun()
+
+            # Inline minutes input
+            with c5:
+                if is_active:
+                    min_key = f"min_{team_abbr}_{pid}"
+                    saved_min = existing.get("minutes_override")
+                    if min_key not in st.session_state:
+                        st.session_state[min_key] = float(saved_min) if saved_min else round(p.proj_min, 1)
                     new_min = st.number_input(
-                        "Minutes override (0=use model)",
-                        min_value=0.0, max_value=48.0, step=0.5,
-                        key=min_wk,
-                        help="Set to 0 to use the model's projected minutes.",
+                        "", min_value=0.0, max_value=48.0, step=1.0,
+                        key=min_key, label_visibility="collapsed",
+                        format="%.0f",
                     )
-                    if new_min > 0 and (min_ov is None or abs(new_min - float(min_ov)) > 0.1):
+                    if saved_min is None and abs(new_min - p.proj_min) > 0.5:
                         set_player_override(team_abbr, pid, "minutes_override", new_min)
-                    elif new_min == 0 and min_ov is not None:
-                        dc.get(pid, {}).pop("minutes_override", None)
-                        _autosave()
-
-                # Close / Reset row
-                rc1, rc2 = st.columns(2)
-                with rc1:
-                    if st.button("Reset", key=f"rst_{team_abbr}_{pid}"):
-                        if pid in st.session_state.depth_charts.get(team_abbr, {}):
-                            st.session_state.depth_charts[team_abbr][pid] = {}
-                        _autosave()
-                        st.session_state[f"show_edit_{team_abbr}_{pid}"] = False
                         if game := st.session_state.get("selected_game"):
                             run_projection(engine, game)
                         st.rerun()
-                with rc2:
-                    if st.button("Close", key=f"cls_{team_abbr}_{pid}"):
-                        st.session_state[f"show_edit_{team_abbr}_{pid}"] = False
+                    elif saved_min is not None and abs(new_min - float(saved_min)) > 0.5:
+                        set_player_override(team_abbr, pid, "minutes_override", new_min)
+                        if game := st.session_state.get("selected_game"):
+                            run_projection(engine, game)
                         st.rerun()
+                else:
+                    st.markdown('<span style="font-size:.80rem;color:#475569;">OUT</span>', unsafe_allow_html=True)
 
-    st.markdown("")
+            # Stats display
+            for col, val, thresh in [(c6,p.proj_pts,20),(c7,p.proj_reb,8),(c8,p.proj_ast,7),(c9,p.proj_pra,35)]:
+                color_v = "#34d399" if val >= thresh else "#94a3b8"
+                col.markdown(
+                    f'<span style="{opacity}font-size:.82rem;color:{color_v};">'
+                    f'{"--" if not is_active else f"{val:.1f}"}</span>',
+                    unsafe_allow_html=True,
+                )
+
+            # Inline injury select
+            with c10:
+                if is_active:
+                    inj_key = f"inj_{team_abbr}_{pid}"
+                    if inj_key not in st.session_state:
+                        st.session_state[inj_key] = inj_r
+                    new_inj = st.selectbox(
+                        "", options=list(INJ_OPTS.keys()),
+                        index=list(INJ_OPTS.keys()).index(
+                            min(INJ_OPTS.keys(), key=lambda x: abs(x - inj_r))
+                        ),
+                        format_func=lambda x: INJ_OPTS[x],
+                        key=inj_key,
+                        label_visibility="collapsed",
+                    )
+                    if abs(new_inj - inj_r) > 0.01:
+                        set_player_override(team_abbr, pid, "injury_rating", new_inj)
+                        if new_inj >= 1.0:
+                            set_player_override(team_abbr, pid, "active", False)
+                        if game := st.session_state.get("selected_game"):
+                            run_projection(engine, game)
+                        st.rerun()
+                else:
+                    st.markdown('<span style="font-size:.75rem;color:#ef4444;">Out</span>', unsafe_allow_html=True)
+
+            # Edit panel toggle
+            with c11:
+                edit_key = f"show_edit_{team_abbr}_{pid}"
+                if edit_key not in st.session_state:
+                    st.session_state[edit_key] = False
+                if st.button("⚡" if has_ov else "≡", key=f"ebtn_{team_abbr}_{pid}",
+                             help="Advanced overrides"):
+                    st.session_state[edit_key] = not st.session_state[edit_key]
+
+            # ── Advanced edit panel ───────────────────────────────────────────
+            if is_active and st.session_state.get(f"show_edit_{team_abbr}_{pid}", False):
+                with st.container():
+                    st.markdown(
+                        f'<div style="background:rgba(30,58,95,.25);border-left:3px solid #0891b2;'
+                        f'border-radius:0 6px 6px 0;padding:8px 12px;margin:2px 0 6px;">'
+                        f'<span style="font-size:.73rem;color:#7dd3fc;font-weight:700;">'
+                        f'Advanced — {p.player_name}</span></div>', unsafe_allow_html=True,
+                    )
+                    _rc1, _rc2 = st.columns(2)
+                    with _rc1:
+                        st.caption("These override the model rates directly.")
+                    with _rc2:
+                        if st.button("Reset all", key=f"rst_{team_abbr}_{pid}"):
+                            if pid in st.session_state.depth_charts.get(team_abbr, {}):
+                                st.session_state.depth_charts[team_abbr][pid].pop("minutes_override", None)
+                                st.session_state.depth_charts[team_abbr][pid].pop("rating_overrides", None)
+                            _autosave()
+                            if game := st.session_state.get("selected_game"):
+                                run_projection(engine, game)
+                            st.session_state[f"show_edit_{team_abbr}_{pid}"] = False
+                            st.rerun()
 
 
 tab_away, tab_home = st.tabs([f"🏀 {team_name(away_id)}", f"🏀 {team_name(home_id)}"])
@@ -297,10 +307,9 @@ with tab_home:
 st.markdown("---")
 st.markdown(
     '<span class="note-text">'
-    'Injury rating: 0.0=Healthy · 0.25=Questionable (likely) · '
-    '0.50=Questionable (doubtful) · 0.75=Doubtful · 1.0=Out. '
-    'Minutes override of 0 uses the model default. '
-    'Click Update Projection to apply changes.'
-    '</span>',
-    unsafe_allow_html=True,
+    '⭐ = Starter · IN/OUT = one-click active toggle (auto-reprojects) · '
+    'Min = projected minutes (editable, auto-reprojects) · '
+    'Inj = injury status · ⚡/≡ = advanced panel · '
+    'Update Projection applies all changes.'
+    '</span>', unsafe_allow_html=True,
 )

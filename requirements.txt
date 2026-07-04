@@ -13,6 +13,7 @@ scikit-learn
 scipy
 nba_api>=1.4.1
 curl_cffi>=0.7.0
+matplotlib>=3.7.0
 gspread>=6.0.0
 google-auth>=2.0.0
 google-api-python-client>=2.0.0

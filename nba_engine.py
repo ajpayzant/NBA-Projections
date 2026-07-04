@@ -131,6 +131,11 @@ class PlayerProjection:
     confidence:     float = 0.5
     _pts_overridden: bool = False
     _min_overridden: bool = False
+    # Per-minute rates stored for minutes-cascade recomputation in _reconcile
+    _pts_pm:  float = 0.0
+    _reb_pm:  float = 0.0
+    _ast_pm:  float = 0.0
+    _fg3m_pm: float = 0.0
 
 
 @dataclass
@@ -501,9 +506,32 @@ class NBAPlayerModel:
     ) -> PlayerProjection:
         """Project one player given their EWM ratings and team projection."""
         ov = overrides or {}
-        pos = str(ratings.get("POS_GROUP", ratings.get("POSITION", "UNK")))
-        if pos not in ("G", "F", "C"):
-            pos = "UNK"
+        raw_pos = str(ratings.get("POS_GROUP", ratings.get("POSITION", "UNK")))
+
+        # Normalize compound positions correctly: "Forward-Guard" → F, "Guard-Forward" → G
+        # Primary role is the FIRST word in hyphenated NBA position strings
+        if raw_pos not in ("G", "F", "C", "UNK"):
+            s = raw_pos.lower().strip()
+            if "-" in s:
+                primary = s.split("-")[0].strip()
+                if "guard" in primary:
+                    raw_pos = "G"
+                elif "forward" in primary:
+                    raw_pos = "F"
+                elif "center" in primary:
+                    raw_pos = "C"
+                else:
+                    raw_pos = "UNK"
+            elif "guard" in s or s in ("pg","sg","g"):
+                raw_pos = "G"
+            elif "forward" in s or s in ("sf","pf","f"):
+                raw_pos = "F"
+            elif "center" in s or s == "c":
+                raw_pos = "C"
+            else:
+                raw_pos = "UNK"
+
+        pos = raw_pos if raw_pos in ("G", "F", "C") else "UNK"
         pos_def = self._POS_DEFAULTS.get(pos, self._POS_DEFAULTS["UNK"])
         gp = int(_nan(ratings.get("games_played"), 0))
 
@@ -585,6 +613,11 @@ class NBAPlayerModel:
             _pts_overridden=pts_overridden,
             _min_overridden=min_overridden,
         )
+        # Store rates so _reconcile can recompute stats after minutes normalization
+        proj._pts_pm  = pts_pm
+        proj._reb_pm  = reb_pm
+        proj._ast_pm  = ast_pm
+        proj._fg3m_pm = fg3m_pm
         # Derived combos
         proj.proj_pra = proj.proj_pts + proj.proj_reb + proj.proj_ast
         proj.proj_pr  = proj.proj_pts + proj.proj_reb
@@ -655,10 +688,42 @@ class NBAPlayerModel:
 
     def _reconcile(self, projs: List[PlayerProjection],
                    tp: TeamProjection) -> List[PlayerProjection]:
-        """Scale active player projections so totals match team projection."""
+        """
+        Scale active player projections so totals match team projection.
+        Also normalizes total minutes to NBA_TOTAL_MINUTES (240 = 5 × 48).
+        """
+        NBA_TOTAL_MINUTES = 240.0   # 5 players × 48 minutes per regulation game
+
         active = [p for p in projs if p.active]
         if not active:
             return projs
+
+        # ── Minutes normalization ─────────────────────────────────────────────
+        # Scale projected minutes so they sum to exactly 240.
+        # Players with explicit minutes_override are held fixed; others scale.
+        min_overridden = [p for p in active if p._min_overridden]
+        min_free       = [p for p in active if not p._min_overridden]
+        fixed_min      = sum(p.proj_min for p in min_overridden)
+        free_min_sum   = sum(p.proj_min for p in min_free)
+        remaining_min  = max(NBA_TOTAL_MINUTES - fixed_min, 0.0)
+
+        if free_min_sum > 0 and remaining_min > 0:
+            min_scale = remaining_min / free_min_sum
+            for p in min_free:
+                p.proj_min = float(np.clip(p.proj_min * min_scale, 0.0, 48.0))
+
+        # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
+        # After normalizing minutes, recompute raw stats from rates, then
+        # normalize PTS/REB/AST/FG3M totals to match team projection.
+        for p in active:
+            if not p._min_overridden:
+                # Recompute stats from rates × new minutes
+                ratings_key = f"_rates_{p.player_id}"
+                if hasattr(p, "_pts_pm"):
+                    p.proj_pts  = max(p._pts_pm  * p.proj_min, 0.0)
+                    p.proj_reb  = max(p._reb_pm  * p.proj_min, 0.0)
+                    p.proj_ast  = max(p._ast_pm  * p.proj_min, 0.0)
+                    p.proj_fg3m = max(p._fg3m_pm * p.proj_min, 0.0)
 
         for stat, team_total in [
             ("pts",  tp.proj_pts),
@@ -680,7 +745,7 @@ class NBAPlayerModel:
                 for p in free:
                     setattr(p, attr, 0.0)
 
-        # Recompute combos after reconcile
+        # ── Recompute combos ──────────────────────────────────────────────────
         for p in active:
             p.proj_pra = p.proj_pts + p.proj_reb + p.proj_ast
             p.proj_pr  = p.proj_pts + p.proj_reb

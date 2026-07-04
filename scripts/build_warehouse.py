@@ -508,12 +508,30 @@ def build_player_features(player_df: pd.DataFrame,
 
     # Position group
     def pos_group(p):
-        s = str(p).lower()
-        if "guard" in s or s in ("pg", "sg", "g"):
+        s = str(p).lower().strip()
+        # Exact single-position codes first
+        if s in ("pg", "sg", "g"):
             return "G"
-        if "forward" in s or s in ("sf", "pf", "f"):
+        if s in ("sf", "pf", "f"):
             return "F"
-        if "center" in s or s == "c":
+        if s in ("c",):
+            return "C"
+        # Hyphenated compound: first word is primary role
+        # NBA API format: "Guard-Forward" = guard primary, "Forward-Guard" = forward primary
+        if "-" in s:
+            primary = s.split("-")[0].strip()
+            if "guard" in primary:
+                return "G"
+            if "forward" in primary:
+                return "F"
+            if "center" in primary:
+                return "C"
+        # Simple text match fallback
+        if s == "guard":
+            return "G"
+        if s == "forward":
+            return "F"
+        if s == "center":
             return "C"
         return "UNK"
 

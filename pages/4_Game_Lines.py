@@ -162,5 +162,8 @@ grid_df = pd.DataFrame(
     index=[f"Home {int(b)}" for b in h_buckets],
     columns=[f"Away {int(b)}" for b in a_buckets],
 )
-st.dataframe(grid_df.style.background_gradient(cmap="Blues", axis=None),
-             use_container_width=True)
+try:
+    st.dataframe(grid_df.style.background_gradient(cmap="Blues", axis=None),
+                 use_container_width=True)
+except Exception:
+    st.dataframe(grid_df, use_container_width=True)
