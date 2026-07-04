@@ -33,9 +33,9 @@ pg_full = con.execute("""
            POS_GROUP, MIN, PTS, REB, AST, STL, BLK, TOV, FG3M,
            MIN_EWM, PTS_PM_EWM, REB_PM_EWM, AST_PM_EWM, STL_PM_EWM,
            BLK_PM_EWM, TOV_PM_EWM, FG3M_PM_EWM,
-           USG_PCT_EWM, IS_HOME, IS_B2B,
-           OPP_ALLOWED_PTS_POS_AVG10, OPP_ALLOWED_REB_POS_AVG10, OPP_ALLOWED_AST_POS_AVG10,
-           GAMES_PLAYED
+           MIN_AVG5, PTS_PM_AVG5, REB_PM_AVG5, AST_PM_AVG5, STL_PM_AVG5,
+           BLK_PM_AVG5, TOV_PM_AVG5, FG3M_PM_AVG5,
+           USG_PCT_EWM, IS_HOME, IS_B2B, GAMES_PLAYED
     FROM clean.player_game_stats
     WHERE SEASON = '2025-26' AND MIN >= 10
     ORDER BY GAME_DATE, PLAYER_ID
@@ -93,49 +93,44 @@ def baseline_project(row):
 # UPDATED: All new model improvements
 # ─────────────────────────────────────────────────────────────────────────────
 def updated_project(row, team_pts_proj=None):
-    """Updated model: USG%, opponent defense, home/B2B adjustments."""
-    pos     = str(row.get('POS_GROUP') or 'UNK')
+    """
+    Updated model matching nba_engine.py exactly:
+    - EWM/AVG5 blend for minutes and rates (70/30)
+    - USG minutes adjustment (no rate blend)
+    - Home court small adjustment
+    - B2B penalty
+    - Opponent position defense REMOVED (audit: 0.013 corr, hurts by 0.41 MAE)
+    """
+    pos = str(row.get('POS_GROUP') or 'UNK')
     if pos not in ('G','F','C'):
         pos = 'UNK'
 
-    # ── Minutes with USG adjustment ──
-    base_min = row.get('MIN_EWM', 20.0) or 20.0
+    # ── Minutes: EWM/AVG5 blend + USG adjustment ──
+    min_ewm  = row.get('MIN_EWM', 20.0) or 20.0
+    min_avg5 = row.get('MIN_AVG5', 0.0) or 0.0
+    base_min = (0.70 * min_ewm + 0.30 * min_avg5) if min_avg5 > 0 else min_ewm
+
     usg_ewm  = row.get('USG_PCT_EWM', LG_USG) or LG_USG
-    usg_diff = usg_ewm - LG_USG
-    usg_adj  = float(np.clip(usg_diff * 0.15, -3.0, 3.0))
+    usg_adj  = float(np.clip((usg_ewm - LG_USG) * 0.15, -3.0, 3.0))
     is_b2b   = bool(row.get('IS_B2B', 0) or 0)
     b2b_adj  = -1.5 if is_b2b else 0.0
     proj_min = float(np.clip(base_min + usg_adj + b2b_adj, 0, 48))
 
-    # ── Rates ──
-    pts_pm  = row.get('PTS_PM_EWM', 0.50) or 0.50
-    reb_pm  = row.get('REB_PM_EWM', 0.18) or 0.18
-    ast_pm  = row.get('AST_PM_EWM', 0.11) or 0.11
-    stl_pm  = row.get('STL_PM_EWM', 0.03) or 0.03
-    blk_pm  = row.get('BLK_PM_EWM', 0.02) or 0.02
-    tov_pm  = row.get('TOV_PM_EWM', 0.05) or 0.05
-    fg3m_pm = row.get('FG3M_PM_EWM',0.06) or 0.06
+    # ── Rates: EWM/AVG5 blend ──
+    def _blend(ewm_key, avg5_key, default):
+        ewm_v  = row.get(ewm_key, default) or default
+        avg5_v = row.get(avg5_key, 0.0) or 0.0
+        return (0.70 * ewm_v + 0.30 * avg5_v) if avg5_v > 0 else ewm_v
 
-    gp = int(row.get('GAMES_PLAYED', 0) or 0)
-    # USG rate blend REMOVED — caused massive overcorrection (star MAE 6.4→15.9)
-    # USG only used for minutes adjustment above
+    pts_pm  = _blend('PTS_PM_EWM',  'PTS_PM_AVG5',  0.50)
+    reb_pm  = _blend('REB_PM_EWM',  'REB_PM_AVG5',  0.18)
+    ast_pm  = _blend('AST_PM_EWM',  'AST_PM_AVG5',  0.11)
+    stl_pm  = _blend('STL_PM_EWM',  'STL_PM_AVG5',  0.03)
+    blk_pm  = _blend('BLK_PM_EWM',  'BLK_PM_AVG5',  0.02)
+    tov_pm  = _blend('TOV_PM_EWM',  'TOV_PM_AVG5',  0.05)
+    fg3m_pm = _blend('FG3M_PM_EWM', 'FG3M_PM_AVG5', 0.06)
 
-    # ── Opponent position defense ──
-    opp_pts = row.get('OPP_ALLOWED_PTS_POS_AVG10', 0.0) or 0.0
-    opp_reb = row.get('OPP_ALLOWED_REB_POS_AVG10', 0.0) or 0.0
-    opp_ast = row.get('OPP_ALLOWED_AST_POS_AVG10', 0.0) or 0.0
-    lg_pos_pts = {'G':14.5,'F':13.2,'C':11.8,'UNK':13.2}.get(pos, 13.2)
-    lg_pos_reb = {'G': 3.5,'F': 5.8,'C': 8.2,'UNK': 5.0}.get(pos,  5.0)
-    lg_pos_ast = {'G': 4.5,'F': 2.8,'C': 2.0,'UNK': 3.0}.get(pos,  3.0)
-
-    if opp_pts > 0 and gp >= 5:
-        pts_pm *= float(np.clip(opp_pts / max(lg_pos_pts, 1), 0.80, 1.20))
-    if opp_reb > 0 and gp >= 5:
-        reb_pm *= float(np.clip(opp_reb / max(lg_pos_reb, 1), 0.80, 1.20))
-    if opp_ast > 0 and gp >= 5:
-        ast_pm *= float(np.clip(opp_ast / max(lg_pos_ast, 1), 0.80, 1.20))
-
-    # ── Home court ──
+    # ── Home court ±2% ──
     is_home = bool(row.get('IS_HOME', 0) or 0)
     home_m  = 1.02 if is_home else 0.98
 
