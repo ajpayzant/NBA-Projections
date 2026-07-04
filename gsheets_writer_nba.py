@@ -47,6 +47,45 @@ def _get_sheet_id() -> str:
     return str(st.secrets["google_drive"]["nba_sheet_id"])
 
 
+def _ensure_access(sheet_id: str) -> None:
+    """
+    Verify access before every write. If a 403 is detected, try the
+    Apps Script reshare trigger (if configured), then raise a clear
+    error with instructions if access still fails.
+    """
+    gc = _get_client()
+    try:
+        gc.open_by_key(sheet_id)
+        return  # access OK
+    except Exception as e:
+        if "403" not in str(e) and "permission" not in str(e).lower():
+            raise  # not a permission error — re-raise
+
+    logger.warning("Sheet access lost (403) — trying Apps Script reshare...")
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from scripts.reshare_sheets import trigger_apps_script_reshare
+        triggered = trigger_apps_script_reshare()
+        if triggered:
+            logger.info("Apps Script reshare triggered — retrying access...")
+            try:
+                gc2 = _get_client()
+                gc2.open_by_key(sheet_id)
+                return  # access restored
+            except Exception:
+                pass
+    except Exception as re2:
+        logger.debug("Apps Script reshare attempt failed: %s", re2)
+
+    raise PermissionError(
+        "Google Sheets access lost.\n\n"
+        "Fix: Open the Season Index sheet → click NBA Tools → Reshare with Service Account\n"
+        "Or run: python scripts/reshare_sheets.py"
+    )
+
+
 def _tab_name(game: Dict) -> str:
     away = str(game.get("away_team_abbr", game.get("away_team", "Away")))
     home = str(game.get("home_team_abbr", game.get("home_team", "Home")))
@@ -189,8 +228,10 @@ def _build_sections(result, game: Dict, engine) -> List[List[Any]]:
 
 def save_snapshot(result, game: Dict, engine) -> str:
     """Write projection snapshot to Google Sheets. Returns tab name."""
+    sheet_id = _get_sheet_id()
+    _ensure_access(sheet_id)   # auto-reshare if 403
     gc  = _get_client()
-    sh  = gc.open_by_key(_get_sheet_id())
+    sh  = gc.open_by_key(sheet_id)
     tab = _tab_name(game)
 
     existing = next((ws for ws in sh.worksheets() if ws.title == tab), None)

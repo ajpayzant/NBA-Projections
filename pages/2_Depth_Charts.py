@@ -53,6 +53,24 @@ with st.sidebar:
     st.markdown("### Controls")
     render_update_btn(engine, key="dc_upd")
     st.markdown("---")
+    st.markdown("### Google Sheets")
+    if st.button("🔗 Reshare Sheets", key="dc_reshare", width="stretch",
+                 help="Re-grant service account access if Save to Sheets is failing"):
+        with st.spinner("Resharing..."):
+            try:
+                import sys as _sys
+                _sys.path.insert(0, str(_ROOT))
+                from scripts.reshare_sheets import reshare_all, verify_access
+                reshare_all(verbose=False)
+                ok = verify_access(verbose=False)
+                if ok:
+                    st.success("Sheets access restored.")
+                else:
+                    st.error("Reshare ran but access still failing. "
+                             "Reshare manually in Google Drive.")
+            except Exception as _e:
+                st.error(f"Reshare failed: {_e}")
+    st.markdown("---")
     st.markdown("### Bulk actions")
     bulk_team = st.radio("Team", [team_name(away_id), team_name(home_id)],
                          key="dc_bulk_team", horizontal=True)
@@ -108,8 +126,9 @@ def _render_team(team_abbr: str, team_nm: str, players):
                        -p.proj_pts)
     )
 
-    hdr = st.columns([3.0, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 0.8])
-    for col, lbl in zip(hdr, ["Player", "Pos", "Injury", "Min",
+    # Columns: Player | Pos | In/Out | Injury | Min | PTS | REB | AST | PRA | Edit
+    hdr = st.columns([2.8, 0.55, 0.65, 0.75, 0.85, 0.85, 0.85, 0.85, 0.85, 0.7])
+    for col, lbl in zip(hdr, ["Player", "Pos", "In/Out", "Injury", "Min",
                                 "PTS", "REB", "AST", "PRA", ""]):
         col.markdown(f"<span style='font-size:.73rem;font-weight:700;color:#64748b;'>{lbl}</span>",
                      unsafe_allow_html=True)
@@ -125,9 +144,11 @@ def _render_team(team_abbr: str, team_nm: str, players):
                          inj_r > 0)
 
         inj_lbl, inj_cls = _inj_label(inj_r)
-        opacity = "" if is_active else "opacity:.4;"
+        opacity = "" if is_active else "opacity:.35;"
 
-        c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([3.0, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 0.8])
+        c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 = st.columns(
+            [2.8, 0.55, 0.65, 0.75, 0.85, 0.85, 0.85, 0.85, 0.85, 0.7]
+        )
 
         with c1:
             mod = f' <span class="modified-badge">⚡</span>' if has_ov else ""
@@ -138,18 +159,48 @@ def _render_team(team_abbr: str, team_nm: str, players):
             )
         with c2:
             st.markdown(pos_badge(p.pos_group), unsafe_allow_html=True)
+
+        # ── In/Out toggle — single click to activate/deactivate ──────────────
         with c3:
+            btn_color  = "#16a34a" if is_active else "#dc2626"
+            btn_text   = "IN" if is_active else "OUT"
+            btn_border = f"border:2px solid {btn_color};"
+            btn_bg     = f"background:rgba({('22,163,74' if is_active else '220,38,38')},.15);"
             st.markdown(
-                f'<span class="{inj_cls}" style="font-size:.78rem;">{inj_lbl}</span>',
+                f'<div style="padding-top:2px;">',
                 unsafe_allow_html=True,
             )
+            if st.button(
+                btn_text,
+                key=f"inout_{team_abbr}_{pid}",
+                help="Click to toggle player In/Out of lineup",
+            ):
+                new_active = not is_active
+                set_player_override(team_abbr, pid, "active", new_active)
+                # If setting Out, also set injury_rating to 1.0 visually
+                if not new_active:
+                    set_player_override(team_abbr, pid, "injury_rating", 1.0)
+                    st.session_state[f"inj_{team_abbr}_{pid}"] = 1.0
+                else:
+                    # Restoring — clear Out injury rating
+                    if existing.get("injury_rating", 0.0) >= 1.0:
+                        set_player_override(team_abbr, pid, "injury_rating", 0.0)
+                        st.session_state[f"inj_{team_abbr}_{pid}"] = 0.0
+                st.rerun()
+
         with c4:
+            st.markdown(
+                f'<span class="{inj_cls}" style="font-size:.75rem;">'
+                f'{"Out" if not is_active else inj_lbl}</span>',
+                unsafe_allow_html=True,
+            )
+        with c5:
             st.markdown(
                 f'<span style="{opacity}font-size:.82rem;color:#94a3b8;">'
                 f'{"--" if not is_active else f"{p.proj_min:.1f}"}</span>',
                 unsafe_allow_html=True,
             )
-        for col, val in [(c5, p.proj_pts), (c6, p.proj_reb), (c7, p.proj_ast), (c8, p.proj_pra)]:
+        for col, val in [(c6, p.proj_pts), (c7, p.proj_reb), (c8, p.proj_ast), (c9, p.proj_pra)]:
             color = "#34d399" if val >= 20 else "#94a3b8"
             col.markdown(
                 f'<span style="{opacity}font-size:.82rem;color:{color};">'
@@ -157,7 +208,7 @@ def _render_team(team_abbr: str, team_nm: str, players):
                 unsafe_allow_html=True,
             )
 
-        with c9:
+        with c10:
             rating_key = f"show_edit_{team_abbr}_{pid}"
             if rating_key not in st.session_state:
                 st.session_state[rating_key] = False
@@ -179,13 +230,7 @@ def _render_team(team_abbr: str, team_nm: str, players):
                 ep1, ep2 = st.columns(2)
 
                 with ep1:
-                    # Active toggle
-                    new_active = st.checkbox("Active", value=is_active,
-                                             key=f"act_{team_abbr}_{pid}")
-                    if new_active != is_active:
-                        set_player_override(team_abbr, pid, "active", new_active)
-
-                    # Injury rating
+                    # Injury rating (Active/Inactive handled by In/Out button in row)
                     inj_key = f"inj_{team_abbr}_{pid}"
                     if inj_key not in st.session_state:
                         st.session_state[inj_key] = inj_r
