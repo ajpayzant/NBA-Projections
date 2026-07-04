@@ -52,12 +52,38 @@ LG_BLK:  float = 4.9
 LG_TOV:  float = 13.5
 LG_FG3M: float = 13.1
 LG_PACE: float = 100.6
-LG_MIN_PER_PLAYER: float = 24.0   # average minutes for an active player
+LG_OFF_RTG: float = 115.5   # league average offensive rating
+LG_DEF_RTG: float = 115.5   # league average defensive rating (symmetric)
+LG_MIN_PER_PLAYER: float = 24.0
 
 # EWM half-life (games)
 HL_STATS:   int = 8
-HL_SHOOT:   int = 12   # shooting % is more stable
-HL_MINUTES: int = 6    # minutes more responsive to recent role changes
+HL_SHOOT:   int = 12
+HL_MINUTES: int = 6
+
+# Per-stat variance ratios for the simulator (empirically tuned from NBA data)
+# Higher ratio = more game-to-game variance relative to the mean
+STAT_VAR_RATIO: Dict[str, float] = {
+    "PTS":  1.55,   # NegBin — NBA scoring is overdispersed
+    "REB":  1.45,   # NegBin — rebounds very variable
+    "AST":  1.65,   # NegBin — assists most variable (depends on teammates)
+    "STL":  2.20,   # NegBin — steals near-random, high variance
+    "BLK":  2.50,   # NegBin — blocks very concentrated on few players
+    "TOV":  1.35,   # NegBin — turnovers more predictable
+    "FG3M": 1.80,   # Binomial-based but overdispersed
+}
+
+# Zero-inflation rates by stat (fraction of games where player gets 0)
+# From Section 3d of research: actual rates for MIN>10 players
+ZERO_RATE: Dict[str, float] = {
+    "PTS":  0.057,
+    "REB":  0.061,
+    "AST":  0.185,
+    "FG3M": 0.383,
+    "STL":  0.467,
+    "BLK":  0.666,
+    "TOV":  0.150,
+}
 
 # Injury rating → minutes multiplier mapping
 # 0.0 = healthy (1.0x), 1.0 = out (0.0x)
@@ -318,6 +344,7 @@ class NBATeamModel:
             ("TEAM_PTS", "pts", LG_PTS), ("TEAM_REB", "reb", LG_REB),
             ("TEAM_AST", "ast", LG_AST), ("TEAM_TOV", "tov", LG_TOV),
             ("TEAM_FG3M", "fg3m", LG_FG3M), ("PACE", "pace", LG_PACE),
+            ("OFF_RTG", "off_rtg", LG_OFF_RTG), ("DEF_RTG", "def_rtg", LG_DEF_RTG),
         ]:
             if col in team_games.columns:
                 self._lg[key] = float(team_games[col].mean())
@@ -357,46 +384,103 @@ class NBATeamModel:
 
         self._fitted = True
 
-    def predict(self, team_r: Dict, opp_r: Dict) -> TeamProjection:
-        """Predict team stats for one team given their and opponent's ratings."""
+    def predict(self, team_r: Dict, opp_r: Dict,
+                is_home: bool = False, is_b2b: bool = False) -> TeamProjection:
+        """
+        Predict team stats using possession-based model with opponent context.
+
+        Approach:
+          1. Estimate game pace from both teams' pace EWMs
+          2. Use team offensive rating and opponent defensive rating to
+             project scoring via: pts = (off_rtg × opp_def_rtg / lg²) × possessions
+          3. Apply home court (+2.5 pts) and back-to-back (-2.0 pts) adjustments
+          4. Blend with EWM direct estimate (50/50) for stability
+        """
         def _get(d, key, default):
             return _nan(d.get(key), default)
 
-        # EWM-based projections
-        proj_pts  = _get(team_r, "TEAM_PTS_EWM",  self._lg.get("pts",  LG_PTS))
-        proj_reb  = _get(team_r, "TEAM_REB_EWM",  self._lg.get("reb",  LG_REB))
-        proj_ast  = _get(team_r, "TEAM_AST_EWM",  self._lg.get("ast",  LG_AST))
-        proj_tov  = _get(team_r, "TEAM_TOV_EWM",  self._lg.get("tov",  LG_TOV))
-        proj_fg3m = _get(team_r, "TEAM_FG3M_EWM", self._lg.get("fg3m", LG_FG3M))
-        proj_pace = _get(team_r, "PACE_EWM",       self._lg.get("pace", LG_PACE))
+        lg_pts  = self._lg.get("pts",  LG_PTS)
+        lg_pace = self._lg.get("pace", LG_PACE)
+        lg_off  = self._lg.get("off_rtg",  LG_OFF_RTG)
+        lg_def  = self._lg.get("def_rtg",  LG_DEF_RTG)
 
-        # Opponent defensive adjustment — how many pts does opponent allow vs league avg?
-        opp_pts_allowed_ewm = _get(opp_r, "TEAM_PTS_EWM", self._lg.get("pts", LG_PTS))
-        lg_pts = self._lg.get("pts", LG_PTS)
-        if lg_pts > 0:
-            opp_def_mult = float(np.clip(opp_pts_allowed_ewm / lg_pts, 0.85, 1.15))
-            proj_pts = proj_pts * opp_def_mult
+        # ── Pace projection ───────────────────────────────────────────────────
+        team_pace = _get(team_r, "PACE_EWM", lg_pace)
+        opp_pace  = _get(opp_r,  "PACE_EWM", lg_pace)
+        proj_pace = 0.5 * team_pace + 0.5 * opp_pace   # game pace = avg of both teams
 
-        # Pace blending (average of both teams)
-        opp_pace = _get(opp_r, "PACE_EWM", proj_pace)
-        proj_pace = 0.5 * proj_pace + 0.5 * opp_pace
+        # ── Possession count ──────────────────────────────────────────────────
+        # NBA regulation = 48 min; pace = possessions per 48 min per team
+        proj_poss = proj_pace  # already in possessions per 48 min
 
-        # RF correction blend (25%)
+        # ── Offensive and defensive ratings ───────────────────────────────────
+        team_off_rtg = _get(team_r, "OFF_RTG_EWM", lg_off)
+        opp_def_rtg  = _get(opp_r,  "DEF_RTG_EWM", lg_def)
+
+        # Fallback: estimate from scoring EWM if ratings not available
+        if team_off_rtg <= 0 or np.isnan(team_off_rtg):
+            team_pts_ewm = _get(team_r, "TEAM_PTS_EWM", lg_pts)
+            team_poss_ewm = _get(team_r, "PACE_EWM", lg_pace)
+            team_off_rtg = (team_pts_ewm / max(team_poss_ewm, 1.0)) * 100.0 if team_poss_ewm > 0 else lg_off
+
+        if opp_def_rtg <= 0 or np.isnan(opp_def_rtg):
+            opp_pts_ewm = _get(opp_r, "TEAM_PTS_EWM", lg_pts)
+            opp_poss_ewm = _get(opp_r, "PACE_EWM", lg_pace)
+            opp_def_rtg = (opp_pts_ewm / max(opp_poss_ewm, 1.0)) * 100.0 if opp_poss_ewm > 0 else lg_def
+
+        # ── Possession-based scoring ──────────────────────────────────────────
+        # Expected pts = (team_off / lg_off) × (opp_def / lg_def) × lg_pts_per_poss × possessions
+        # Normalised so an average team vs average opponent = league average
+        if lg_off > 0 and lg_def > 0:
+            off_factor = team_off_rtg / lg_off
+            def_factor = opp_def_rtg  / lg_def
+            pace_factor = proj_pace   / lg_pace
+            proj_pts_possession = lg_pts * off_factor * def_factor * pace_factor
+        else:
+            proj_pts_possession = lg_pts
+
+        # ── EWM direct estimate ───────────────────────────────────────────────
+        proj_pts_ewm = _get(team_r, "TEAM_PTS_EWM", lg_pts)
+
+        # ── Blend: 50% possession model + 50% EWM ────────────────────────────
+        # Research showed EWM alone has corr=0.241; possession model adds opponent context.
+        # 50/50 blend is more stable than either alone.
+        proj_pts = 0.50 * proj_pts_possession + 0.50 * proj_pts_ewm
+
+        # ── Home court advantage ──────────────────────────────────────────────
+        # Empirically ~2.5 pts in modern NBA (reduced from historical 3.2)
+        if is_home:
+            proj_pts += 2.5
+
+        # ── Back-to-back penalty ──────────────────────────────────────────────
+        # Teams on B2B score ~2.0 fewer points on average
+        if is_b2b:
+            proj_pts -= 2.0
+
+        # ── Other stats: pace-scaled EWMs ────────────────────────────────────
+        pace_scale = proj_pace / max(lg_pace, 1.0)
+        proj_reb  = _get(team_r, "TEAM_REB_EWM",  self._lg.get("reb",  LG_REB))  * pace_scale
+        proj_ast  = _get(team_r, "TEAM_AST_EWM",  self._lg.get("ast",  LG_AST))  * pace_scale
+        proj_tov  = _get(team_r, "TEAM_TOV_EWM",  self._lg.get("tov",  LG_TOV))  * pace_scale
+        proj_fg3m = _get(team_r, "TEAM_FG3M_EWM", self._lg.get("fg3m", LG_FG3M)) * pace_scale
+
+        # ── RF correction blend (25% weight, only for pts/ast) ────────────────
         if self._rf_models and hasattr(self, "_rf_feat_cols"):
             try:
                 feat_vals = np.array([
                     _nan(team_r.get(c), 0.0) for c in self._rf_feat_cols
                 ]).reshape(1, -1)
-                for target, attr in [("TEAM_PTS", "proj_pts"), ("TEAM_AST", "proj_ast"), ("PACE", "proj_pace")]:
+                for target, attr, base in [
+                    ("TEAM_PTS", "proj_pts", proj_pts),
+                    ("TEAM_AST", "proj_ast", proj_ast),
+                ]:
                     if target in self._rf_models:
                         Xs = self._rf_scalers[target].transform(feat_vals)
                         rf_pred = float(self._rf_models[target].predict(Xs)[0])
                         if attr == "proj_pts":
-                            proj_pts  = 0.75 * proj_pts  + 0.25 * rf_pred
+                            proj_pts = 0.75 * proj_pts + 0.25 * rf_pred
                         elif attr == "proj_ast":
-                            proj_ast  = 0.75 * proj_ast  + 0.25 * rf_pred
-                        elif attr == "proj_pace":
-                            proj_pace = 0.75 * proj_pace + 0.25 * rf_pred
+                            proj_ast = 0.75 * proj_ast + 0.25 * rf_pred
             except Exception:
                 pass
 
@@ -406,12 +490,12 @@ class NBATeamModel:
             team_name=str(team_r.get("TEAM_NAME", "")),
             opp_team_id=int(_nan(opp_r.get("TEAM_ID"), 0)),
             opp_team_abbr=str(opp_r.get("TEAM_ABBREVIATION", "")),
-            proj_pts=max(proj_pts, 80.0),
-            proj_reb=max(proj_reb, 30.0),
-            proj_ast=max(proj_ast, 15.0),
-            proj_tov=max(proj_tov, 8.0),
-            proj_fg3m=max(proj_fg3m, 5.0),
-            proj_pace=max(proj_pace, 88.0),
+            proj_pts=float(np.clip(proj_pts, 80.0, 145.0)),
+            proj_reb=float(np.clip(proj_reb, 28.0, 60.0)),
+            proj_ast=float(np.clip(proj_ast, 12.0, 40.0)),
+            proj_tov=float(np.clip(proj_tov,  8.0, 22.0)),
+            proj_fg3m=float(np.clip(proj_fg3m, 3.0, 25.0)),
+            proj_pace=float(np.clip(proj_pace, 88.0, 115.0)),
         )
 
 
@@ -541,7 +625,25 @@ class NBAPlayerModel:
             proj_min = float(ov["minutes_override"])
             min_overridden = True
         else:
-            proj_min = _nan(ratings.get("MIN_EWM"), pos_def["min"])
+            base_min = _nan(ratings.get("MIN_EWM"), pos_def["min"])
+
+            # USG-weighted minutes adjustment:
+            # High-usage players (stars) tend to play more than their EWM suggests
+            # because they're needed in close games. Low-usage bench players tend
+            # to be pulled when teams go up big.
+            # Apply a credibility-weighted tilt: USG vs league average (18%) pulls
+            # projected minutes in the same direction, up to ±3 minutes.
+            usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
+            lg_usg  = 18.0  # league average usage %
+            usg_diff = usg_ewm - lg_usg   # positive for high-usage, negative for low
+            # Each 1% of USG above average → +0.15 min adjustment (max ±3 min)
+            usg_min_adj = float(np.clip(usg_diff * 0.15, -3.0, 3.0))
+
+            # Back-to-back: all players lose ~1.5 min on B2B nights
+            is_b2b = bool(_nan(ratings.get("IS_B2B"), 0.0))
+            b2b_adj = -1.5 if is_b2b else 0.0
+
+            proj_min = base_min + usg_min_adj + b2b_adj
 
         # Injury rating reduces minutes
         injury = float(ov.get("injury_rating", _nan(ratings.get("injury_rating"), 0.0)))
@@ -558,18 +660,67 @@ class NBAPlayerModel:
         tov_pm  = self._get_rate(ratings, "TOV_PM_EWM",  pos, "tov_pm")
         fg3m_pm = self._get_rate(ratings, "FG3M_PM_EWM", pos, "fg3m_pm")
 
-        # Opponent adjustment on scoring (±10% cap)
-        opp_def_mult = 1.0
-        if team_proj.proj_pts > 0:
-            lg_pts_per_min = LG_PTS / (5 * LG_MIN_PER_PLAYER)
-            # Implicit: team model already adjusts for opponent, just apply proportionally
-            opp_def_mult = float(np.clip(team_proj.proj_pts / max(LG_PTS, 1.0), 0.90, 1.10))
-        pts_pm = pts_pm * opp_def_mult
+        # ── USG% into rate projection ─────────────────────────────────────────
+        # Research: USG_PCT_EWM has 0.582 correlation with actual PTS and 0.169
+        # GBM importance. Blend USG-scaled rate with EWM rate for pts/ast/tov.
+        # USG directly predicts pts/ast/tov because it measures offensive involvement.
+        usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
+        lg_usg  = 18.0
+        if usg_ewm > 0 and gp >= 10:
+            # USG-implied pts rate: players at league-average USG score at league rate
+            # Scaling: 1% more USG → ~proportional scoring rate increase
+            usg_scale = float(np.clip(usg_ewm / lg_usg, 0.5, 2.5))
+            lg_pts_pm  = LG_PTS / (5 * LG_MIN_PER_PLAYER)
+            usg_pts_pm = lg_pts_pm * usg_scale
+            # Blend: 70% own EWM rate + 30% USG-implied rate
+            pts_pm  = 0.70 * pts_pm  + 0.30 * usg_pts_pm
+
+            lg_ast_pm  = LG_AST / (5 * LG_MIN_PER_PLAYER)
+            usg_ast_pm = lg_ast_pm * usg_scale * 0.6  # ast scales less than pts with USG
+            ast_pm  = 0.70 * ast_pm  + 0.30 * usg_ast_pm
+
+            lg_tov_pm  = LG_TOV / (5 * LG_MIN_PER_PLAYER)
+            usg_tov_pm = lg_tov_pm * usg_scale
+            tov_pm  = 0.70 * tov_pm  + 0.30 * usg_tov_pm
+
+        # ── Opponent defensive context ────────────────────────────────────────
+        # Apply position-specific opponent defense adjustment.
+        # opp_allowed_pts/reb/ast for this player's position group.
+        # Research: OPP_ALLOWED_PTS_POS_AVG10 corr=0.067 with minutes (weak directly)
+        # but is more meaningful for stat rates.
+        opp_pts_allowed = _nan(ratings.get("OPP_ALLOWED_PTS_POS_AVG10"), 0.0)
+        if opp_pts_allowed > 0 and gp >= 5:
+            # Position-level league average pts allowed
+            lg_pos_pts = {"G": 14.5, "F": 13.2, "C": 11.8, "UNK": 13.2}.get(pos, 13.2)
+            opp_def_pos_mult = float(np.clip(opp_pts_allowed / max(lg_pos_pts, 1.0), 0.80, 1.20))
+        else:
+            # Fall back to team-level opponent adjustment
+            opp_def_pos_mult = float(np.clip(team_proj.proj_pts / max(LG_PTS, 1.0), 0.88, 1.12))
+        pts_pm = pts_pm * opp_def_pos_mult
+
+        # Rebounds: opponent allows different rebounding by position
+        opp_reb_allowed = _nan(ratings.get("OPP_ALLOWED_REB_POS_AVG10"), 0.0)
+        if opp_reb_allowed > 0 and gp >= 5:
+            lg_pos_reb = {"G": 3.5, "F": 5.8, "C": 8.2, "UNK": 5.0}.get(pos, 5.0)
+            opp_reb_mult = float(np.clip(opp_reb_allowed / max(lg_pos_reb, 1.0), 0.80, 1.20))
+            reb_pm = reb_pm * opp_reb_mult
+
+        # Assists: opponent allows different assist rates by position
+        opp_ast_allowed = _nan(ratings.get("OPP_ALLOWED_AST_POS_AVG10"), 0.0)
+        if opp_ast_allowed > 0 and gp >= 5:
+            lg_pos_ast = {"G": 4.5, "F": 2.8, "C": 2.0, "UNK": 3.0}.get(pos, 3.0)
+            opp_ast_mult = float(np.clip(opp_ast_allowed / max(lg_pos_ast, 1.0), 0.80, 1.20))
+            ast_pm = ast_pm * opp_ast_mult
+
+        # ── Home court adjustment ─────────────────────────────────────────────
+        # Research Section 5c: home avg +0.22 pts. Small but real.
+        is_home = bool(_nan(ratings.get("IS_HOME"), 0.0))
+        home_mult = 1.02 if is_home else 0.98   # ±2% scoring adjustment
 
         # ── Raw projections ───────────────────────────────────────────────────
-        proj_pts  = pts_pm  * proj_min
+        proj_pts  = pts_pm  * proj_min * home_mult
         proj_reb  = reb_pm  * proj_min
-        proj_ast  = ast_pm  * proj_min
+        proj_ast  = ast_pm  * proj_min * home_mult
         proj_stl  = stl_pm  * proj_min
         proj_blk  = blk_pm  * proj_min
         proj_tov  = tov_pm  * proj_min
@@ -632,6 +783,8 @@ class NBAPlayerModel:
         overrides: Optional[Dict[int, Dict]] = None,
         season: Optional[str] = None,
         active_player_ids: Optional[List[int]] = None,
+        is_home: bool = False,
+        is_b2b: bool = False,
     ) -> List[PlayerProjection]:
         """
         Project all players for a team and normalize totals to team projection.
@@ -670,7 +823,11 @@ class NBAPlayerModel:
         for r in roster_ratings:
             pid = int(_nan(r.get("PLAYER_ID"), 0))
             ov = overrides.get(pid, {})
-            proj = self.project_player(r, team_proj, ov)
+            # Inject game context into ratings so project_player can use it
+            r_with_ctx = dict(r)
+            r_with_ctx["IS_HOME"] = 1.0 if is_home else 0.0
+            r_with_ctx["IS_B2B"]  = 1.0 if is_b2b  else 0.0
+            proj = self.project_player(r_with_ctx, team_proj, ov)
             proj.active = bool(ov.get("active", True))
             if not proj.active or proj.injury_rating >= 1.0:
                 proj.active = False
@@ -831,44 +988,74 @@ class NBASimulator:
         active = [p for p in player_projs if p.active]
         results = []
 
+        def _zinb(mu: float, stat: str) -> np.ndarray:
+            """
+            Zero-Inflated Negative Binomial draw for a given stat.
+            Uses empirically-measured zero rates and variance ratios from research.
+
+            For BLK and STL (low mean, high zero rate) this correctly produces
+            many zero-game outcomes that match real NBA distributions.
+            """
+            zero_rate = ZERO_RATE.get(stat, 0.05)
+            var_ratio  = STAT_VAR_RATIO.get(stat, 1.5)
+            mu = max(mu, 0.001)
+
+            # Adjust mean of non-zero component to preserve overall mean
+            # E[X] = (1 - zero_rate) * mu_nonzero → mu_nonzero = mu / (1 - zero_rate)
+            mu_nonzero = mu / max(1.0 - zero_rate, 0.01)
+
+            nb_n, nb_p = self._negbinom_params(mu_nonzero, var_ratio)
+            is_zero = rng.random(n) < zero_rate
+            counts  = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+            return np.where(is_zero, 0.0, counts)
+
         # Draw raw stats for each player
         raw: Dict[int, Dict[str, np.ndarray]] = {}
         for p in active:
             pid = p.player_id
             draws: Dict[str, np.ndarray] = {}
 
-            # Minutes: Normal
-            min_sigma = max(p.proj_min * 0.20, 2.0)
+            # Minutes: Normal with std proportional to minutes tier
+            # Higher-minute players have lower relative variance (more consistent role)
+            min_cv = 0.25 if p.proj_min < 20 else (0.18 if p.proj_min < 32 else 0.14)
+            min_sigma = max(p.proj_min * min_cv, 2.0)
             min_draws = np.clip(rng.normal(p.proj_min, min_sigma, n), 0, 48)
             draws["MIN"] = min_draws
 
-            # PTS: NegBin (var/mean ~1.4 for NBA scoring)
-            nb_n, nb_p = self._negbinom_params(max(p.proj_pts, 0.01), 1.4)
-            draws["PTS"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+            # PTS: Zero-Inflated NegBin
+            draws["PTS"] = _zinb(p.proj_pts,  "PTS")
 
-            # REB: NegBin (var/mean ~1.3)
-            nb_n, nb_p = self._negbinom_params(max(p.proj_reb, 0.01), 1.3)
-            draws["REB"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+            # REB: Zero-Inflated NegBin
+            draws["REB"] = _zinb(p.proj_reb,  "REB")
 
-            # AST: NegBin (var/mean ~1.5)
-            nb_n, nb_p = self._negbinom_params(max(p.proj_ast, 0.01), 1.5)
-            draws["AST"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+            # AST: Zero-Inflated NegBin (most variable stat)
+            draws["AST"] = _zinb(p.proj_ast,  "AST")
 
-            # STL: Poisson-like (var/mean ~1.1)
-            draws["STL"] = rng.poisson(max(p.proj_stl, 0.01), n).astype(float)
+            # STL: Zero-Inflated NegBin (high zero rate: 46.7% of games)
+            draws["STL"] = _zinb(p.proj_stl,  "STL")
 
-            # BLK: Poisson-like
-            draws["BLK"] = rng.poisson(max(p.proj_blk, 0.01), n).astype(float)
+            # BLK: Zero-Inflated NegBin (very high zero rate: 66.6%)
+            draws["BLK"] = _zinb(p.proj_blk,  "BLK")
 
-            # TOV: NegBin
-            nb_n, nb_p = self._negbinom_params(max(p.proj_tov, 0.01), 1.2)
-            draws["TOV"] = rng.negative_binomial(nb_n, nb_p, n).astype(float)
+            # TOV: Zero-Inflated NegBin
+            draws["TOV"] = _zinb(p.proj_tov,  "TOV")
 
-            # FG3M: Binomial(attempts, fg3_pct)
-            # Estimate 3PA from rate and minutes
-            fg3a_per_min = p.proj_fg3m / max(p.proj_min, 1.0) / p.fg3_pct if p.fg3_pct > 0 else 0.0
-            fg3a_draws = np.clip(rng.poisson(max(fg3a_per_min * min_draws.mean(), 0.01), n), 0, 20)
-            draws["FG3M"] = rng.binomial(fg3a_draws.astype(int), p.fg3_pct, n).astype(float)
+            # FG3M: Zero-Inflated Binomial
+            # Model as: player either attempts 3s (prob = 1 - zero_rate) or doesn't
+            # When they attempt, draw from Binomial(attempts, fg3_pct)
+            zero_fg3 = ZERO_RATE.get("FG3M", 0.38)
+            if p.proj_min > 0 and p.fg3_pct > 0:
+                fg3a_per_min = p.proj_fg3m / (p.proj_min * p.fg3_pct)
+                expected_fg3a = max(fg3a_per_min * min_draws.mean(), 0.01)
+                is_zero_3 = rng.random(n) < zero_fg3
+                fg3a_draws = np.clip(rng.poisson(
+                    expected_fg3a / max(1.0 - zero_fg3, 0.01), n), 0, 18)
+                draws["FG3M"] = np.where(
+                    is_zero_3, 0.0,
+                    rng.binomial(fg3a_draws.astype(int), p.fg3_pct, n).astype(float)
+                )
+            else:
+                draws["FG3M"] = np.zeros(n)
 
             raw[pid] = draws
 
@@ -1068,8 +1255,13 @@ class NBAProjectionEngine:
         hf = self.get_team_rating(home_team_abbr, game_date)
         af = self.get_team_rating(away_team_abbr, game_date)
 
-        h_proj = self.team_model.predict(hf, af)
-        a_proj = self.team_model.predict(af, hf)
+        # Extract home/away and B2B context from team ratings
+        h_is_home = bool(_nan(hf.get("IS_HOME"), 0.0))  # 1 if home, 0 if away
+        h_is_b2b  = bool(_nan(hf.get("IS_B2B"),  0.0))
+        a_is_b2b  = bool(_nan(af.get("IS_B2B"),  0.0))
+        # For scheduled future games both teams are neutral-ish; home team gets advantage
+        h_proj = self.team_model.predict(hf, af, is_home=True,  is_b2b=h_is_b2b)
+        a_proj = self.team_model.predict(af, hf, is_home=False, is_b2b=a_is_b2b)
 
         # Set team names from ratings
         h_proj.team_abbr = home_team_abbr
@@ -1106,11 +1298,13 @@ class NBAProjectionEngine:
 
         h_players = (self.player_model.project_roster(
             home_team_abbr, h_proj, _team_ov(home_team_abbr),
-            current_season, active_player_ids=h_active_ids)
+            current_season, active_player_ids=h_active_ids,
+            is_home=True, is_b2b=h_is_b2b)
             if self.player_model else [])
         a_players = (self.player_model.project_roster(
             away_team_abbr, a_proj, _team_ov(away_team_abbr),
-            current_season, active_player_ids=a_active_ids)
+            current_season, active_player_ids=a_active_ids,
+            is_home=False, is_b2b=a_is_b2b)
             if self.player_model else [])
 
         game_sim = self.simulator.simulate_game(h_proj, a_proj)
