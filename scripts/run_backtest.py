@@ -42,25 +42,13 @@ pg_full = con.execute("""
 """).df()
 
 tg_full = con.execute("""
-    SELECT t.TEAM_ABBREVIATION, t.GAME_DATE, t.GAME_ID, t.IS_HOME, t.IS_B2B,
-           t.TEAM_PTS, t.TEAM_PTS_EWM, t.PACE_EWM,
-           -- Derive offensive rating: pts per 100 possessions (pace proxy)
-           CASE WHEN t.PACE > 0 THEN (t.TEAM_PTS / t.PACE) * 100.0 ELSE 115.5 END AS OFF_RTG,
-           -- Opponent pts allowed as defensive rating proxy
-           o.TEAM_PTS AS OPP_PTS,
-           CASE WHEN t.PACE > 0 THEN (o.TEAM_PTS / t.PACE) * 100.0 ELSE 115.5 END AS DEF_RTG,
-           -- Leakage-safe season averages
-           AVG(CASE WHEN t.PACE > 0 THEN (t.TEAM_PTS/t.PACE)*100.0 ELSE 115.5 END)
-               OVER (PARTITION BY t.TEAM_ABBREVIATION ORDER BY t.GAME_DATE
-               ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS OFF_RTG_EWM,
-           AVG(CASE WHEN t.PACE > 0 THEN (o.TEAM_PTS/t.PACE)*100.0 ELSE 115.5 END)
-               OVER (PARTITION BY t.TEAM_ABBREVIATION ORDER BY t.GAME_DATE
-               ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS DEF_RTG_EWM
-    FROM clean.team_game_stats t
-    JOIN clean.team_game_stats o
-      ON t.GAME_ID = o.GAME_ID AND t.TEAM_ABBREVIATION != o.TEAM_ABBREVIATION
-    WHERE t.SEASON = '2025-26'
-    ORDER BY t.GAME_DATE, t.TEAM_ABBREVIATION
+    SELECT TEAM_ABBREVIATION, GAME_DATE, GAME_ID, IS_HOME, IS_B2B,
+           TEAM_PTS, TEAM_PTS_EWM, PACE_EWM,
+           OFF_RTG, DEF_RTG, NET_RTG,
+           OFF_RTG_EWM, DEF_RTG_EWM, NET_RTG_EWM
+    FROM clean.team_game_stats
+    WHERE SEASON = '2025-26'
+    ORDER BY GAME_DATE, TEAM_ABBREVIATION
 """).df()
 
 con.close()
@@ -128,16 +116,9 @@ def updated_project(row, team_pts_proj=None):
     tov_pm  = row.get('TOV_PM_EWM', 0.05) or 0.05
     fg3m_pm = row.get('FG3M_PM_EWM',0.06) or 0.06
 
-    # ── USG into rate ──
     gp = int(row.get('GAMES_PLAYED', 0) or 0)
-    if usg_ewm > 0 and gp >= 10:
-        usg_scale    = float(np.clip(usg_ewm / LG_USG, 0.5, 2.5))
-        lg_pts_pm    = LG_PTS / (5 * 24.0)
-        lg_ast_pm    = 26.5  / (5 * 24.0)
-        lg_tov_pm    = 13.5  / (5 * 24.0)
-        pts_pm  = 0.70 * pts_pm  + 0.30 * (lg_pts_pm * usg_scale)
-        ast_pm  = 0.70 * ast_pm  + 0.30 * (lg_ast_pm * usg_scale * 0.6)
-        tov_pm  = 0.70 * tov_pm  + 0.30 * (lg_tov_pm * usg_scale)
+    # USG rate blend REMOVED — caused massive overcorrection (star MAE 6.4→15.9)
+    # USG only used for minutes adjustment above
 
     # ── Opponent position defense ──
     opp_pts = row.get('OPP_ALLOWED_PTS_POS_AVG10', 0.0) or 0.0
