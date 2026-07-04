@@ -681,11 +681,12 @@ class NBAPlayerModel:
         proj_min = proj_min * injury_minutes_mult(injury)
         proj_min = float(np.clip(proj_min, 0.0, 48.0))
 
-        # ── Rates (per minute) — blend EWM (stable) with AVG5 (recent form) ──
-        # 70% EWM + 30% AVG5 mirrors how we blend minutes above.
-        # For players with sparse AVG5, falls back to EWM only.
+        # ── Rates (per minute) — blend EWM with AVG5, user overrides take priority ──
         def _blend_rate(ewm_key, avg5_key, pos_key):
-            ewm_v  = self._get_rate(ratings, ewm_key,  pos, pos_key)
+            # User override takes full priority over model
+            if ewm_key in ov and ov[ewm_key] is not None:
+                return float(ov[ewm_key])
+            ewm_v  = self._get_rate(ratings, ewm_key, pos, pos_key)
             avg5_v = _nan(ratings.get(avg5_key), 0.0)
             if avg5_v > 0:
                 return 0.70 * ewm_v + 0.30 * avg5_v
@@ -735,10 +736,10 @@ class NBAPlayerModel:
             proj_pts = float(ov["pts_override"])
             pts_overridden = True
 
-        # Shooting rates for simulator distribution shaping
-        fg_pct  = _nan(ratings.get("FG_PCT_EWM"),  0.46)
-        fg3_pct = _nan(ratings.get("FG3_PCT_EWM"), 0.36)
-        ft_pct  = _nan(ratings.get("FT_PCT_EWM"),  0.77)
+        # Shooting rates — user override takes priority
+        fg_pct  = float(ov.get("FG_PCT_EWM")  or _nan(ratings.get("FG_PCT_EWM"),  0.46))
+        fg3_pct = float(ov.get("FG3_PCT_EWM") or _nan(ratings.get("FG3_PCT_EWM"), 0.36))
+        ft_pct  = _nan(ratings.get("FT_PCT_EWM"), 0.77)
 
         confidence = min(0.40 + 0.012 * gp, 0.90)
 

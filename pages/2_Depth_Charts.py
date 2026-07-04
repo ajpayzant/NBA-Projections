@@ -88,8 +88,21 @@ with st.sidebar:
 
 st.markdown("---")
 
-INJ_OPTS = {0.0:"Healthy", 0.25:"Questionable (likely)", 0.50:"Questionable (doubtful)",
-            0.75:"Doubtful", 1.00:"Out"}
+# Injury tag labels matching standard NBA injury report designations
+INJ_OPTS = {
+    0.00: "Healthy",      # Will play, no limitation
+    0.25: "Probable",     # Very likely to play, minor issue
+    0.50: "Questionable", # 50/50, could go either way
+    0.75: "Doubtful",     # Unlikely to play
+    1.00: "Out",          # Will not play
+}
+INJ_COLORS = {
+    0.00: "#34d399",  # green
+    0.25: "#a3e635",  # light green
+    0.50: "#fbbf24",  # amber
+    0.75: "#f97316",  # orange
+    1.00: "#ef4444",  # red
+}
 
 
 def _render_team(team_abbr: str, team_nm: str, players):
@@ -168,18 +181,34 @@ def _render_team(team_abbr: str, team_nm: str, players):
             with c2:
                 st.markdown(pos_badge(p.pos_group), unsafe_allow_html=True)
 
-            # Starter toggle
+            # Starter toggle — clicking a bench player to start swaps out the
+            # lowest-projected current starter to keep exactly 5 starters
             with c3:
                 if is_active:
                     if st.button("⭐" if is_strt else "☆",
                                  key=f"strt_{team_abbr}_{pid}",
-                                 help="Toggle starter/bench"):
+                                 help="Toggle starter/bench — bench players auto-swap lowest starter"):
                         if is_strt:
-                            # Remove from starters — only clear if user explicitly set
-                            if "is_starter" in existing:
-                                del st.session_state.depth_charts[team_abbr][pid]["is_starter"]
-                                _autosave()
+                            # Move to bench: clear is_starter
+                            if pid in st.session_state.depth_charts.get(team_abbr, {}):
+                                st.session_state.depth_charts[team_abbr][pid].pop("is_starter", None)
+                            _autosave()
                         else:
+                            # Move to starters — if already 5 starters, bump the lowest scorer
+                            current_starter_ids = {p2.player_id for p2 in active_players
+                                                   if dc.get(p2.player_id, {}).get("is_starter")}
+                            auto_ids = {p2.player_id for p2 in starters
+                                        if p2.player_id not in current_starter_ids}
+                            total_starters = current_starter_ids | auto_ids
+                            if len(total_starters) >= 5:
+                                # Find lowest-projected starter to bump to bench
+                                starter_objs = [p2 for p2 in active_players
+                                                if p2.player_id in total_starters]
+                                bump = min(starter_objs, key=lambda x: x.proj_pts)
+                                # Mark bumped player as explicitly benched
+                                if bump.player_id in st.session_state.depth_charts.get(team_abbr, {}):
+                                    st.session_state.depth_charts[team_abbr][bump.player_id].pop("is_starter", None)
+                                set_player_override(team_abbr, bump.player_id, "is_starter", False)
                             set_player_override(team_abbr, pid, "is_starter", True)
                         st.rerun()
                 else:
@@ -213,9 +242,9 @@ def _render_team(team_abbr: str, team_nm: str, players):
                     if min_key not in st.session_state:
                         st.session_state[min_key] = float(saved_min) if saved_min else round(p.proj_min, 1)
                     new_min = st.number_input(
-                        "", min_value=0.0, max_value=48.0, step=1.0,
+                        "", min_value=0.0, max_value=48.0, step=0.5,
                         key=min_key, label_visibility="collapsed",
-                        format="%.0f",
+                        format="%.1f",
                     )
                     if saved_min is None and abs(new_min - p.proj_min) > 0.5:
                         set_player_override(team_abbr, pid, "minutes_override", new_min)
@@ -239,30 +268,39 @@ def _render_team(team_abbr: str, team_nm: str, players):
                     unsafe_allow_html=True,
                 )
 
-            # Inline injury select
+            # Inline injury status
             with c10:
                 if is_active:
                     inj_key = f"inj_{team_abbr}_{pid}"
                     if inj_key not in st.session_state:
                         st.session_state[inj_key] = inj_r
+                    closest = min(INJ_OPTS.keys(), key=lambda x: abs(x - inj_r))
                     new_inj = st.selectbox(
                         "", options=list(INJ_OPTS.keys()),
-                        index=list(INJ_OPTS.keys()).index(
-                            min(INJ_OPTS.keys(), key=lambda x: abs(x - inj_r))
-                        ),
+                        index=list(INJ_OPTS.keys()).index(closest),
                         format_func=lambda x: INJ_OPTS[x],
                         key=inj_key,
                         label_visibility="collapsed",
+                        help="Healthy=100% play | Probable=~90% | Questionable=50/50 | Doubtful=~10% | Out=0%",
                     )
                     if abs(new_inj - inj_r) > 0.01:
                         set_player_override(team_abbr, pid, "injury_rating", new_inj)
                         if new_inj >= 1.0:
                             set_player_override(team_abbr, pid, "active", False)
+                            st.session_state[f"inout_{team_abbr}_{pid}"] = False
                         if game := st.session_state.get("selected_game"):
                             run_projection(engine, game)
                         st.rerun()
+                    # Show colored label
+                    inj_color = INJ_COLORS.get(closest, "#94a3b8")
+                    inj_label = INJ_OPTS.get(closest, "")
+                    st.markdown(
+                        f'<div style="font-size:.65rem;color:{inj_color};'
+                        f'font-weight:700;margin-top:-4px;">{inj_label}</div>',
+                        unsafe_allow_html=True,
+                    )
                 else:
-                    st.markdown('<span style="font-size:.75rem;color:#ef4444;">Out</span>', unsafe_allow_html=True)
+                    st.markdown('<span style="font-size:.75rem;color:#ef4444;font-weight:700;">Out</span>', unsafe_allow_html=True)
 
             # Edit panel toggle
             with c11:
@@ -280,16 +318,68 @@ def _render_team(team_abbr: str, team_nm: str, players):
                         f'<div style="background:rgba(30,58,95,.25);border-left:3px solid #0891b2;'
                         f'border-radius:0 6px 6px 0;padding:8px 12px;margin:2px 0 6px;">'
                         f'<span style="font-size:.73rem;color:#7dd3fc;font-weight:700;">'
-                        f'Advanced — {p.player_name}</span></div>', unsafe_allow_html=True,
+                        f'Rate Overrides — {p.player_name}</span>'
+                        f'<span style="font-size:.68rem;color:#64748b;margin-left:8px;">'
+                        f'Model defaults shown — change to override projections</span>'
+                        f'</div>', unsafe_allow_html=True,
                     )
-                    _rc1, _rc2 = st.columns(2)
-                    with _rc1:
-                        st.caption("These override the model rates directly.")
-                    with _rc2:
-                        if st.button("Reset all", key=f"rst_{team_abbr}_{pid}"):
+
+                    rating_overrides = existing.get("rating_overrides", {})
+
+                    # Rating definitions: key, label, help, min, max, step, model_default
+                    _RATINGS = [
+                        ("PTS_PM_EWM",  "Pts / Min",   "Points per minute rate. Model avg ~0.50.", 0.0, 2.0, 0.01,  p.proj_pts / max(p.proj_min, 1.0)),
+                        ("REB_PM_EWM",  "Reb / Min",   "Rebounds per minute rate.",               0.0, 1.2, 0.01,  p.proj_reb / max(p.proj_min, 1.0)),
+                        ("AST_PM_EWM",  "Ast / Min",   "Assists per minute rate.",                0.0, 0.8, 0.01,  p.proj_ast / max(p.proj_min, 1.0)),
+                        ("FG3M_PM_EWM", "3PM / Min",   "3-pointers made per minute.",             0.0, 0.5, 0.005, p.proj_fg3m / max(p.proj_min, 1.0)),
+                        ("FG3_PCT_EWM", "3PT %",       "3-point shooting percentage.",            0.0, 0.65,0.01,  p.fg3_pct),
+                        ("FG_PCT_EWM",  "FG %",        "Field goal percentage.",                  0.25, 0.75,0.01, p.fg_pct),
+                    ]
+
+                    r1, r2, r3 = st.columns(3)
+                    _rate_cols = [r1, r2, r3, r1, r2, r3]
+
+                    _changed = False
+                    for (rkey, rlabel, rhelp, rmin, rmax, rstep, rdefault), rcol in zip(_RATINGS, _rate_cols):
+                        saved_rv = rating_overrides.get(rkey)
+                        wk = f"rate_{team_abbr}_{pid}_{rkey}"
+                        # Always reseed from saved or model default
+                        display_val = float(saved_rv) if saved_rv is not None else round(float(rdefault), 4)
+                        display_val = float(np.clip(display_val, rmin, rmax))
+                        if wk not in st.session_state:
+                            st.session_state[wk] = display_val
+                        with rcol:
+                            new_rv = st.number_input(
+                                rlabel, min_value=rmin, max_value=rmax, step=rstep,
+                                key=wk, help=rhelp, format="%.3f",
+                            )
+                            if saved_rv is None:
+                                st.markdown(f'<div style="font-size:.62rem;color:#64748b;margin-top:-6px;">model: {rdefault:.3f}</div>', unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'<div style="font-size:.62rem;color:#fbbf24;margin-top:-6px;">override</div>', unsafe_allow_html=True)
+                            # Save if changed from model default
+                            if abs(new_rv - display_val) > rstep * 0.1:
+                                from _engine_state import set_player_rating
+                                set_player_rating(team_abbr, pid, rkey, new_rv)
+                                _changed = True
+                            elif saved_rv is not None and abs(new_rv - float(saved_rv)) < rstep * 0.1:
+                                pass  # unchanged saved value — fine
+
+                    if _changed:
+                        if game := st.session_state.get("selected_game"):
+                            run_projection(engine, game)
+                        st.rerun()
+
+                    _rc_reset, _ = st.columns([1, 3])
+                    with _rc_reset:
+                        if st.button("Reset all rates", key=f"rst_{team_abbr}_{pid}"):
                             if pid in st.session_state.depth_charts.get(team_abbr, {}):
                                 st.session_state.depth_charts[team_abbr][pid].pop("minutes_override", None)
                                 st.session_state.depth_charts[team_abbr][pid].pop("rating_overrides", None)
+                            # Clear widget state
+                            for rkey, *_ in _RATINGS:
+                                wk = f"rate_{team_abbr}_{pid}_{rkey}"
+                                st.session_state.pop(wk, None)
                             _autosave()
                             if game := st.session_state.get("selected_game"):
                                 run_projection(engine, game)

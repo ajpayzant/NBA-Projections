@@ -153,10 +153,10 @@ with lc4:
     st.markdown(card("Spread", spread_label,
                      f"{gm.spread_home_odds} / {gm.spread_away_odds}"), unsafe_allow_html=True)
 
-# ── Score distribution chart ──────────────────────────────────────────────────
+# ── Score distribution chart — Away on left, Home on right (matches above) ───
 st.markdown("### Score Distribution")
 fc1, fc2 = st.columns(2)
-for col, pts_arr, abbr in [(fc1, gs.home_pts, home_id), (fc2, gs.away_pts, away_id)]:
+for col, pts_arr, abbr in [(fc1, gs.away_pts, away_id), (fc2, gs.home_pts, home_id)]:
     with col:
         fig = go.Figure()
         fig.add_trace(go.Histogram(x=pts_arr, nbinsx=40,
