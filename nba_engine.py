@@ -164,6 +164,7 @@ class PlayerProjection:
     _reb_pm:  float = 0.0
     _ast_pm:  float = 0.0
     _fg3m_pm: float = 0.0
+    _usg_ewm: float = 18.0  # usage % for USG-weighted minute reallocation
 
 
 @dataclass
@@ -615,7 +616,8 @@ class NBAPlayerModel:
     ) -> PlayerProjection:
         """Project one player given their EWM ratings and team projection."""
         ov = overrides or {}
-        raw_pos = str(ratings.get("POS_GROUP", ratings.get("POSITION", "UNK")))
+        # Position override from depth chart takes full priority
+        raw_pos = str(ov.get("position_override") or ratings.get("POS_GROUP") or ratings.get("POSITION") or "UNK")
 
         # Normalize compound positions correctly: "Forward-Guard" → F, "Guard-Forward" → G
         # Primary role is the FIRST word in hyphenated NBA position strings
@@ -768,11 +770,12 @@ class NBAPlayerModel:
             _pts_overridden=pts_overridden,
             _min_overridden=min_overridden,
         )
-        # Store rates so _reconcile can recompute stats after minutes normalization
+        # Store rates and USG so _reconcile can use them
         proj._pts_pm  = pts_pm
         proj._reb_pm  = reb_pm
         proj._ast_pm  = ast_pm
         proj._fg3m_pm = fg3m_pm
+        proj._usg_ewm = float(np.clip(usg_ewm, 8.0, 40.0))
         # Derived combos
         proj.proj_pra = proj.proj_pts + proj.proj_reb + proj.proj_ast
         proj.proj_pr  = proj.proj_pts + proj.proj_reb
@@ -859,9 +862,12 @@ class NBAPlayerModel:
         if not active:
             return projs
 
-        # ── Minutes normalization ─────────────────────────────────────────────
+        # ── Minutes normalization — USG-weighted reallocation ─────────────────
         # Scale projected minutes so they sum to exactly 240.
-        # Players with explicit minutes_override are held fixed; others scale.
+        # Fixed players (explicit override) stay unchanged.
+        # Free players scale proportionally to their USG — high-usage players
+        # absorb more of the missing minutes when a player is deactivated,
+        # which better reflects how coaches actually distribute minutes.
         min_overridden = [p for p in active if p._min_overridden]
         min_free       = [p for p in active if not p._min_overridden]
         fixed_min      = sum(p.proj_min for p in min_overridden)
@@ -869,9 +875,55 @@ class NBAPlayerModel:
         remaining_min  = max(NBA_TOTAL_MINUTES - fixed_min, 0.0)
 
         if free_min_sum > 0 and remaining_min > 0:
-            min_scale = remaining_min / free_min_sum
-            for p in min_free:
-                p.proj_min = float(np.clip(p.proj_min * min_scale, 0.0, 48.0))
+            # USG-weighted allocation with iterative cap handling.
+            # High-USG stars absorb more of the available minutes, but no one
+            # can exceed 48 minutes. Any surplus from capped players is
+            # redistributed to the remaining uncapped players.
+            usg_weights = []
+            for p2 in min_free:
+                usg = _nan(getattr(p2, "_usg_ewm", 18.0), 18.0)
+                usg = float(np.clip(usg, 8.0, 40.0))
+                usg_weights.append(p2.proj_min * (usg / 18.0))
+
+            total_weight = sum(usg_weights)
+            if total_weight > 0:
+                # Iterative allocation: distribute `remaining_min` minutes to free
+                # players weighted by USG. Any player whose share would exceed
+                # 48 min is capped and the surplus is redistributed to the rest.
+                pool        = remaining_min
+                allocated   = {p2.player_id: 0.0 for p2 in min_free}
+                weights_map = {p2.player_id: w for p2, w in zip(min_free, usg_weights)}
+                capped      = set()
+
+                for _ in range(len(min_free) + 1):
+                    free_ids = [p2.player_id for p2 in min_free if p2.player_id not in capped]
+                    free_w   = sum(weights_map[i] for i in free_ids)
+                    if free_w <= 0 or not free_ids:
+                        break
+                    surplus = 0.0
+                    tentative = {}
+                    for i in free_ids:
+                        share = pool * (weights_map[i] / free_w)
+                        tentative[i] = share
+                    for i in free_ids:
+                        total_so_far = allocated[i] + tentative[i]
+                        if total_so_far >= 48.0:
+                            surplus += total_so_far - 48.0
+                            allocated[i] = 48.0
+                            capped.add(i)
+                        else:
+                            allocated[i] = total_so_far
+                    if surplus <= 0.01:
+                        break
+                    pool = surplus
+
+                for p2 in min_free:
+                    p2.proj_min = float(np.clip(allocated.get(p2.player_id, 0.0), 0.0, 48.0))
+            else:
+                # Fallback: flat proportional
+                min_scale = remaining_min / free_min_sum
+                for p2 in min_free:
+                    p2.proj_min = float(np.clip(p2.proj_min * min_scale, 0.0, 48.0))
 
         # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
         # After normalizing minutes, recompute raw stats from rates, then

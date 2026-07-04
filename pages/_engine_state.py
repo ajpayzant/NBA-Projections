@@ -256,6 +256,8 @@ def build_player_overrides() -> Dict[int, Dict]:
                 entry["injury_rating"] = float(settings["injury_rating"])
             if "minutes_override" in settings:
                 entry["minutes_override"] = float(settings["minutes_override"])
+            if "position_override" in settings:
+                entry["position_override"] = str(settings["position_override"])
             for rk, rv in settings.get("rating_overrides", {}).items():
                 entry[rk] = rv
             if entry:
