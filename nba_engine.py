@@ -884,8 +884,13 @@ class NBAPlayerModel:
             else:
                 proj.active = True
 
-            if not proj.active or proj.injury_rating >= 1.0:
+            if proj.injury_rating >= 1.0:
+                # Injury=Out is treated the same as a user deactivation for
+                # USG redistribution — the player's possessions go to teammates.
                 proj.active = False
+                proj._user_deactivated = True
+                proj = self._zero(proj)
+            elif not proj.active:
                 proj = self._zero(proj)
             projections.append(proj)
 
@@ -954,15 +959,32 @@ class NBAPlayerModel:
                     remaining -= p2.proj_min
                     # proj_min unchanged — player plays their natural role
 
-            # If free players don't fill the budget (e.g. two stars deactivated and
-            # the remaining rotation sums to less than 240), scale everyone up
-            # proportionally so the game total hits exactly 240 minutes.
-            free_sum = sum(p2.proj_min for p2 in min_free if p2.active)
-            if free_sum > 0 and remaining > 0.5:
-                scale = (free_sum + remaining) / free_sum
-                for p2 in min_free:
-                    if p2.active:
-                        p2.proj_min = float(np.clip(p2.proj_min * scale, 0.0, 48.0))
+            # If free players don't fill the budget (e.g. stars deactivated and
+            # the remaining rotation sums to less than 240), scale up iteratively.
+            # Iteration handles the 48-min cap: capped players are excluded from
+            # further scaling so their surplus redistributes to uncapped players.
+            if remaining > 0.5:
+                pool = remaining
+                uncapped = [p2 for p2 in min_free if p2.active and p2.proj_min < 48.0]
+                for _ in range(len(uncapped) + 1):
+                    free_sum = sum(p2.proj_min for p2 in uncapped)
+                    if free_sum <= 0 or not uncapped:
+                        break
+                    scale = (free_sum + pool) / free_sum
+                    newly_capped = []
+                    surplus = 0.0
+                    for p2 in uncapped:
+                        new_min = p2.proj_min * scale
+                        if new_min > 48.0:
+                            surplus += new_min - 48.0
+                            p2.proj_min = 48.0
+                            newly_capped.append(p2)
+                        else:
+                            p2.proj_min = float(new_min)
+                    uncapped = [p2 for p2 in uncapped if p2 not in newly_capped]
+                    pool = surplus
+                    if pool <= 0.1:
+                        break
 
         # Refresh the active list after rotation-fill may have changed active flags
         active = [p for p in projs if p.active]
