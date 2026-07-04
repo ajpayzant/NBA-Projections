@@ -165,7 +165,8 @@ class PlayerProjection:
     _ast_pm:  float = 0.0
     _fg3m_pm: float = 0.0
     _usg_ewm: float = 18.0
-    _dnp_default: bool = False  # True when model defaults this player to inactive (low minutes history)
+    _dnp_default: bool = False       # True when model defaults inactive (low minutes history)
+    _user_deactivated: bool = False  # True when user explicitly set active=False
 
 
 @dataclass
@@ -875,6 +876,8 @@ class NBAPlayerModel:
             user_set_active = "active" in ov
             if user_set_active:
                 proj.active = bool(ov["active"])
+                if not proj.active:
+                    proj._user_deactivated = True
             elif min_ewm < DNP_MIN_THRESHOLD:
                 proj.active = False
                 proj._dnp_default = True
@@ -951,10 +954,56 @@ class NBAPlayerModel:
                     remaining -= p2.proj_min
                     # proj_min unchanged — player plays their natural role
 
+            # If free players don't fill the budget (e.g. two stars deactivated and
+            # the remaining rotation sums to less than 240), scale everyone up
+            # proportionally so the game total hits exactly 240 minutes.
+            free_sum = sum(p2.proj_min for p2 in min_free if p2.active)
+            if free_sum > 0 and remaining > 0.5:
+                scale = (free_sum + remaining) / free_sum
+                for p2 in min_free:
+                    if p2.active:
+                        p2.proj_min = float(np.clip(p2.proj_min * scale, 0.0, 48.0))
+
         # Refresh the active list after rotation-fill may have changed active flags
         active = [p for p in projs if p.active]
         if not active:
             return projs
+
+        # ── USG redistribution (teammate-out context adjustment) ─────────────
+        # When a player is manually deactivated, their expected USG% is
+        # redistributed to the remaining active players proportionally to
+        # their own USG. This adjusts PTS/min and AST/min rates upward for
+        # players who will absorb more possessions.
+        #
+        # Data: when Brown (USG=35%) is out, Pritchard's PTS/min increases
+        # by +0.07 (+17%). The mechanism: ~35% of possessions are now split
+        # among remaining players. Each player's effective rate scales by
+        # (new_usg / base_usg). We cap the multiplier at 1.40 to prevent
+        # outliers from inflating projections unreasonably.
+        #
+        # Only applied when a player is explicitly deactivated by the user
+        # (not DNP-default), since DNP-defaults are fringe players whose
+        # absence doesn't materially shift the rotation's usage.
+        orphaned_usg = sum(
+            getattr(p, "_usg_ewm", 18.0)
+            for p in projs
+            if getattr(p, "_user_deactivated", False)
+        )
+        if orphaned_usg > 0.5:
+            active_usgs = [max(getattr(p, "_usg_ewm", 18.0), 1.0) for p in active]
+            total_active_usg = sum(active_usgs)
+            if total_active_usg > 0:
+                for p, base_usg in zip(active, active_usgs):
+                    # Each player absorbs their proportional share of orphaned USG
+                    gained_usg = orphaned_usg * (base_usg / total_active_usg)
+                    new_usg = base_usg + gained_usg
+                    rate_mult = float(np.clip(new_usg / base_usg, 1.0, 1.40))
+                    if hasattr(p, "_pts_pm"):
+                        p._pts_pm  *= rate_mult
+                        p._ast_pm  *= rate_mult
+                        # Rebounding is less USG-dependent; apply half the multiplier
+                        p._reb_pm  *= (1.0 + (rate_mult - 1.0) * 0.5)
+                        p._fg3m_pm *= rate_mult
 
         # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
         # After normalizing minutes, recompute raw stats from rates, then
@@ -962,7 +1011,6 @@ class NBAPlayerModel:
         for p in active:
             if not p._min_overridden:
                 # Recompute stats from rates × new minutes
-                ratings_key = f"_rates_{p.player_id}"
                 if hasattr(p, "_pts_pm"):
                     p.proj_pts  = max(p._pts_pm  * p.proj_min, 0.0)
                     p.proj_reb  = max(p._reb_pm  * p.proj_min, 0.0)
