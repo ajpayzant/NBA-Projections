@@ -1,4 +1,4 @@
-"""Page 2 — Depth Charts & Lineup Management"""
+"""Page 2 — Lineups"""
 from __future__ import annotations
 import sys
 from pathlib import Path
@@ -19,7 +19,7 @@ from _engine_state import (
     render_update_btn, run_projection, pos_badge, _autosave,
 )
 
-st.set_page_config(page_title="Depth Charts · NBA", page_icon="🏀", layout="wide")
+st.set_page_config(page_title="Lineups · NBA", page_icon="🏀", layout="wide")
 init_session()
 st.markdown(SHARED_CSS, unsafe_allow_html=True)
 st.markdown("""
@@ -46,7 +46,7 @@ home_id = result.home_team
 away_id = result.away_team
 game    = st.session_state.get("selected_game", {})
 
-st.title("📋 Depth Charts")
+st.title("📋 Lineups")
 st.markdown(f"**{team_name(away_id)} @ {team_name(home_id)}** · {str(game.get('game_date',''))[:10]}")
 
 # ── Baseline result (no overrides) for delta display ─────────────────────────
