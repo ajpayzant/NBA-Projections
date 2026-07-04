@@ -739,6 +739,16 @@ def main(full_rebuild: bool = False):
     team_raw_path   = RAW_DIR / "team_game_logs.parquet"
     pos_cache_path  = REF_DIR / "player_positions.json"
 
+    # Off-season detection — defined here so all code paths can use it
+    _today = dt.date.today()
+    is_offseason = (
+        (_today.month >= 7 and _today.month <= 9) or
+        (_today.month == 6 and _today.day > 20) or
+        (_today.month == 10 and _today.day < 5)
+    )
+    if is_offseason:
+        logger.info("NBA off-season (%s) — live API calls will be skipped.", _today)
+
     # ── Load or scrape raw logs ───────────────────────────────────────────────
     if not full_rebuild and player_raw_path.exists() and team_raw_path.exists():
         logger.info("Loading cached raw logs...")
@@ -759,13 +769,7 @@ def main(full_rebuild: bool = False):
                 team_raw = pd.concat([team_raw, new_t], ignore_index=True)
 
         # Incremental update: fetch only recent games for the current season.
-        # Skip during the off-season (mid-June through mid-September) — no games
-        # to fetch and the API endpoint either times out or returns nothing.
-        today = dt.date.today()
-        is_offseason = (today.month >= 7 and today.month <= 9) or \
-                       (today.month == 6 and today.day > 20) or \
-                       (today.month == 10 and today.day < 5)
-
+        # Skipped during off-season (is_offseason defined at top of main()).
         if is_offseason:
             logger.info("Off-season detected (%s) — skipping incremental game fetch. "
                         "Cache is up to date from end of last season.", today)
@@ -832,15 +836,18 @@ def main(full_rebuild: bool = False):
         except Exception:
             pass
 
-    logger.info("Fetching upcoming schedule (max 3 retries, skip if unavailable)...")
-    try:
-        fresh = fetch_upcoming_games(days_ahead=14)
-        if not fresh.empty:
-            schedule_df = fresh
-            schedule_df.to_parquet(schedule_cache, index=False)
-            logger.info("Schedule updated: %d upcoming games", len(schedule_df))
-    except Exception as e:
-        logger.warning("Schedule fetch failed (%s) — using cached or empty schedule", e)
+    if is_offseason:
+        logger.info("Off-season — skipping schedule fetch (no games scheduled).")
+    else:
+        logger.info("Fetching upcoming schedule (max 3 retries, skip if unavailable)...")
+        try:
+            fresh = fetch_upcoming_games(days_ahead=14)
+            if not fresh.empty:
+                schedule_df = fresh
+                schedule_df.to_parquet(schedule_cache, index=False)
+                logger.info("Schedule updated: %d upcoming games", len(schedule_df))
+        except Exception as e:
+            logger.warning("Schedule fetch failed (%s) — using cached or empty schedule", e)
 
     logger.info("Schedule: %d games available", len(schedule_df))
 
