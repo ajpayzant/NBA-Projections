@@ -28,25 +28,57 @@ st.markdown(SHARED_CSS, unsafe_allow_html=True)
 engine = get_engine()
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
+ALL_TEAMS = [
+    "ATL","BOS","BKN","CHA","CHI","CLE","DAL","DEN","DET","GSW",
+    "HOU","IND","LAC","LAL","MEM","MIA","MIL","MIN","NOP","NYK",
+    "OKC","ORL","PHI","PHX","POR","SAC","SAS","TOR","UTA","WAS",
+]
+
 with st.sidebar:
     st.markdown("### Game Selection")
 
     upcoming = engine.upcoming_games()
-    if not upcoming:
-        st.warning("No upcoming games found. Run the data pipeline first.")
-        st.stop()
 
-    # Group by date
-    game_options = {}
-    for g in upcoming:
-        date = str(g.get("game_date", ""))[:10]
-        label = f"{g.get('away_team_abbr','?')} @ {g.get('home_team_abbr','?')}"
-        key = f"{date} — {label}"
-        game_options[key] = g
+    if upcoming:
+        mode = st.radio("Mode", ["Scheduled games", "Manual matchup"],
+                        key="sel_mode_p1", horizontal=True)
+    else:
+        mode = "Manual matchup"
+        st.info("Off-season — no scheduled games. Use manual matchup.")
 
-    selected_key = st.selectbox("Select game", list(game_options.keys()),
-                                key="game_selector_p1")
-    game = game_options[selected_key]
+    if mode == "Scheduled games" and upcoming:
+        game_options = {}
+        for g in upcoming:
+            date = str(g.get("game_date", ""))[:10]
+            label = f"{g.get('away_team_abbr','?')} @ {g.get('home_team_abbr','?')}"
+            key = f"{date} — {label}"
+            game_options[key] = g
+        selected_key = st.selectbox("Select game", list(game_options.keys()),
+                                    key="game_selector_p1")
+        game = game_options[selected_key]
+    else:
+        st.markdown("**Away team**")
+        away_pick = st.selectbox("Away", ALL_TEAMS,
+                                 index=ALL_TEAMS.index("LAL"),
+                                 key="manual_away_p1",
+                                 label_visibility="collapsed")
+        st.markdown("**Home team**")
+        home_pick = st.selectbox("Home", ALL_TEAMS,
+                                 index=ALL_TEAMS.index("BOS"),
+                                 key="manual_home_p1",
+                                 label_visibility="collapsed")
+        game_date_pick = st.date_input("Game date",
+                                       value=_dt.date.today(),
+                                       key="manual_date_p1")
+        game = {
+            "away_team_abbr": away_pick,
+            "home_team_abbr": home_pick,
+            "away_team_id":   0,
+            "home_team_id":   0,
+            "game_date":      str(game_date_pick),
+            "game_id":        f"{away_pick}@{home_pick}_{game_date_pick}",
+            "status":         "Manual",
+        }
 
     st.markdown("---")
     hold_pct = st.number_input("Market hold %", min_value=0.0, max_value=15.0,
@@ -184,69 +216,96 @@ with tab_away:
 with tab_home:
     _player_table(result.home_players, result.home_player_sims)
 
-# ── Export ────────────────────────────────────────────────────────────────────
+# ── Export + Save ─────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("### Export")
-if st.button("📥 Download Projection Package (Excel)", type="secondary"):
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as xl:
-        meta = pd.DataFrame([
-            ("Game", f"{team_name(away_id)} @ {team_name(home_id)}"),
-            ("Date", str(game.get("game_date",""))[:10]),
-            ("Generated", result.generated_at),
-        ], columns=["Field", "Value"])
-        meta.to_excel(xl, sheet_name="Metadata", index=False)
+st.markdown("### Export & Save")
 
-        lines_rows = [
-            (f"{team_name(away_id)} ML", gm.away_ml, f"{gm.away_win_prob*100:.1f}%"),
-            (f"{team_name(home_id)} ML", gm.home_ml, f"{gm.home_win_prob*100:.1f}%"),
-            ("Total Over",  f"{gm.total_line}", gm.over_odds),
-            ("Total Under", f"{gm.total_line}", gm.under_odds),
-        ]
-        pd.DataFrame(lines_rows, columns=["Market","Odds","Fair Prob"]).to_excel(
-            xl, sheet_name="Game Lines", index=False)
+_btn_dl, _btn_save, _btn_sync = st.columns([1, 1, 1], gap="small")
 
-        for abbr, players, sims in [
-            (away_id, result.away_players, result.away_player_sims),
-            (home_id, result.home_players, result.home_player_sims),
-        ]:
-            sim_map = {s.player_id: s for s in sims}
-            prop_rows = []
-            for p in [x for x in players if x.active]:
-                sim = sim_map.get(p.player_id)
-                if sim is None:
-                    continue
-                pv = sim.proj_values
-                pm = sim.prop_lines
-                for stat in ["PTS", "REB", "AST", "FG3M", "STL", "BLK", "TOV", "PRA", "PR", "PA", "RA"]:
-                    if stat not in pv:
+with _btn_dl:
+    if st.button("📥 Download Excel", type="secondary", width="stretch"):
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as xl:
+            meta = pd.DataFrame([
+                ("Game", f"{team_name(away_id)} @ {team_name(home_id)}"),
+                ("Date", str(game.get("game_date",""))[:10]),
+                ("Generated", result.generated_at),
+            ], columns=["Field", "Value"])
+            meta.to_excel(xl, sheet_name="Metadata", index=False)
+            lines_rows = [
+                (f"{team_name(away_id)} ML", gm.away_ml, f"{gm.away_win_prob*100:.1f}%"),
+                (f"{team_name(home_id)} ML", gm.home_ml, f"{gm.home_win_prob*100:.1f}%"),
+                ("Total Over",  f"{gm.total_line}", gm.over_odds),
+                ("Total Under", f"{gm.total_line}", gm.under_odds),
+            ]
+            pd.DataFrame(lines_rows, columns=["Market","Odds","Fair Prob"]).to_excel(
+                xl, sheet_name="Game Lines", index=False)
+            for abbr, players, sims in [
+                (away_id, result.away_players, result.away_player_sims),
+                (home_id, result.home_players, result.home_player_sims),
+            ]:
+                sim_map = {s.player_id: s for s in sims}
+                prop_rows = []
+                for p in [x for x in players if x.active]:
+                    sim = sim_map.get(p.player_id)
+                    if sim is None:
                         continue
-                    mkt = result.player_markets.get(p.player_id, {}).get(stat, {})
-                    prop_rows.append({
-                        "Player":       p.player_name,
-                        "Team":         abbr,
-                        "Pos":          p.pos_group,
-                        "Stat":         stat,
-                        "Projection":   round(pv.get(stat, 0), 2),
-                        "Line":         pm.get(stat, ""),
-                        "Over Odds":    mkt.get("over_odds", ""),
-                        "Under Odds":   mkt.get("under_odds", ""),
-                        "Fair P(Over)": round(mkt.get("fair_over", 0), 3),
-                        "P10":          round(mkt.get("p10", 0), 1),
-                        "P50":          round(mkt.get("p50", 0), 1),
-                        "P90":          round(mkt.get("p90", 0), 1),
-                        "Actual Result": "",
-                        "Hit/Miss":      "",
-                    })
-            if prop_rows:
-                pd.DataFrame(prop_rows).to_excel(
-                    xl, sheet_name=f"Props {abbr}", index=False)
+                    pv = sim.proj_values
+                    pm = sim.prop_lines
+                    for stat in ["PTS","REB","AST","FG3M","STL","BLK","TOV","PRA","PR","PA","RA"]:
+                        if stat not in pv:
+                            continue
+                        mkt = result.player_markets.get(p.player_id, {}).get(stat, {})
+                        prop_rows.append({
+                            "Player": p.player_name, "Team": abbr, "Pos": p.pos_group,
+                            "Stat": stat, "Projection": round(pv.get(stat, 0), 2),
+                            "Line": pm.get(stat, ""),
+                            "Over Odds": mkt.get("over_odds", ""),
+                            "Under Odds": mkt.get("under_odds", ""),
+                            "Fair P(Over)": round(mkt.get("fair_over", 0), 3),
+                            "P10": round(mkt.get("p10", 0), 1),
+                            "P50": round(mkt.get("p50", 0), 1),
+                            "P90": round(mkt.get("p90", 0), 1),
+                            "Actual Result": "", "Hit/Miss": "",
+                        })
+                if prop_rows:
+                    pd.DataFrame(prop_rows).to_excel(
+                        xl, sheet_name=f"Props {abbr}", index=False)
+        buf.seek(0)
+        fname = (f"NBA_{team_name(away_id).replace(' ','_')}_at_"
+                 f"{team_name(home_id).replace(' ','_')}_"
+                 f"{str(game.get('game_date',''))[:10]}.xlsx")
+        st.download_button("⬇ Click to download", data=buf.getvalue(),
+                           file_name=fname,
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           key="dl_xlsx")
 
-    buf.seek(0)
-    fname = (f"NBA_{team_name(away_id).replace(' ','_')}_at_"
-             f"{team_name(home_id).replace(' ','_')}_"
-             f"{str(game.get('game_date',''))[:10]}.xlsx")
-    st.download_button("⬇ Click to download", data=buf.getvalue(),
-                       file_name=fname,
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                       key="dl_xlsx")
+with _btn_save:
+    if st.button("☁️ Save to Google Sheets", type="primary", width="stretch"):
+        with st.spinner("Saving to Google Sheets..."):
+            try:
+                sys.path.insert(0, str(_ROOT))
+                from gsheets_writer_nba import save_snapshot
+                tab = save_snapshot(result, game, engine)
+                st.success(f"Saved → NBA Projections · tab: {tab}")
+            except Exception as e:
+                st.error(f"Save failed: {e}")
+
+with _btn_sync:
+    if st.button("🔄 Sync Actuals", type="secondary", width="stretch"):
+        with st.spinner("Syncing actuals from warehouse..."):
+            try:
+                from gsheets_writer_nba import sync_actuals, _tab_name
+                import os as _os
+                db_path = _os.getenv("NBA_DB_PATH", str(
+                    _ROOT / "data" / "analytics_database" / "nba_warehouse.duckdb"))
+                tab = _tab_name(game)
+                counts = sync_actuals(tab, db_path)
+                st.success(
+                    f"Synced actuals: {counts['players_updated']} player rows, "
+                    f"{counts['teams_updated']} team rows updated"
+                )
+            except ValueError as e:
+                st.warning(str(e))
+            except Exception as e:
+                st.error(f"Sync failed: {e}")

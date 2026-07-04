@@ -1,0 +1,46 @@
+name: Update NBA Rosters
+
+on:
+  # Every Monday at 8 AM UTC — catches summer trades, free agency moves
+  schedule:
+    - cron: "0 8 * * 1"
+
+  # Manual trigger any time
+  workflow_dispatch: {}
+
+jobs:
+  update-rosters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas numpy pyarrow curl_cffi requests
+
+      - name: Update roster cache
+        run: python nba_roster_cache.py
+
+      - name: Commit updated rosters
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/reference_tables/current_rosters.json
+          if git diff --staged --quiet; then
+            echo "No roster changes detected."
+          else
+            git commit -m "Auto-update NBA rosters [skip ci]"
+            git push
+          fi
