@@ -772,7 +772,7 @@ def main(full_rebuild: bool = False):
         # Skipped during off-season (is_offseason defined at top of main()).
         if is_offseason:
             logger.info("Off-season detected (%s) — skipping incremental game fetch. "
-                        "Cache is up to date from end of last season.", today)
+                        "Cache is up to date from end of last season.", _today)
         else:
             logger.info("Incremental update: fetching recent games for %s", CURRENT_SEASON)
             try:
