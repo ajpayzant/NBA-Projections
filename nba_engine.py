@@ -164,8 +164,12 @@ class PlayerProjection:
     _reb_pm:  float = 0.0
     _ast_pm:  float = 0.0
     _fg3m_pm: float = 0.0
-    # Original EWM rate (before USG redistribution) — used for lineup strength calc
-    _pts_pm_ewm_orig: float = 0.0
+    # Original EWM rates and minutes (before rotation fill / USG redistribution)
+    # — used to compute PRA share for lineup-impact team adjustment
+    _pts_pm_ewm_orig:    float = 0.0
+    _reb_pm_ewm_orig:    float = 0.0
+    _ast_pm_ewm_orig:    float = 0.0
+    _base_min_for_share: float = 0.0
     _usg_ewm: float = 18.0
     _dnp_default: bool = False       # True when model defaults inactive (low minutes history)
     _user_deactivated: bool = False  # True when user explicitly set active=False
@@ -803,9 +807,13 @@ class NBAPlayerModel:
         proj._reb_pm  = reb_pm
         proj._ast_pm  = ast_pm
         proj._fg3m_pm = fg3m_pm
-        # Preserve original EWM rate before USG redistribution may adjust _pts_pm.
-        # Used to measure lineup strength via natural_sum = sum(orig_rate × proj_min).
+        # Preserve original EWM rate and base minutes before rotation fill / USG
+        # redistribution adjusts them. Used to compute each player's scoring share
+        # of the team total for the lineup-impact team adjustment.
         proj._pts_pm_ewm_orig = pts_pm
+        proj._reb_pm_ewm_orig = reb_pm
+        proj._ast_pm_ewm_orig = ast_pm
+        proj._base_min_for_share = float(proj.proj_min)  # pre-fill projected minutes
         usg_ewm = _nan(ratings.get("USG_PCT_EWM"), 18.0)
         proj._usg_ewm = float(np.clip(usg_ewm, 8.0, 40.0))
         # Derived combos
@@ -1047,22 +1055,63 @@ class NBAPlayerModel:
         # so min(natural_sum, team_model) ≈ team_model — no change.
         # When stars are out: natural_sum drops by their contribution, automatically
         # reflecting the weaker lineup without any magic multipliers.
-        # ── Stat reconciliation (rates auto-update from scaled minutes) ───────
-        # After normalizing minutes, recompute raw stats from rates × new minutes,
-        # then normalize each stat to the team projection total.
+        # ── Lineup-impact adjustment on team total ────────────────────────────
+        # When players are explicitly deactivated (user-set or injury=Out), the
+        # team's projected scoring total and win probability are adjusted based on
+        # each absent player's PRA share of the team projection.
         #
-        # The team model total (tp.proj_pts) is NOT adjusted based on who is active.
-        # Rationale: the team model is context-aware (opponent defense, pace, home/away,
-        # B2B) and already correctly varies by matchup. With only 5–20 games of data
-        # per player absence scenario, any player-specific adjustment adds more noise
-        # than signal. The measured drop when a star is absent (~7 pts for BOS/Brown)
-        # is largely explained by weaker opponent schedules during those rest games.
-        # What DOES change correctly when a player is deactivated:
-        #   1. Remaining players get more minutes (rotation fill)
-        #   2. Their rates increase via USG redistribution
-        #   3. Those adjusted rates × minutes are distributed to the same team total
-        # The net effect: teammates project higher, which is correct.
-        # Win probability is updated separately after both lineups are resolved.
+        # Using PRA share (not just PTS) captures all-around contributors like
+        # Jokic whose rebounds and assists drive team scoring even beyond their PTS.
+        #
+        # Formulas derived by OLS regression from 421 player-season observations
+        # (4 seasons, players with 12%+ share and 5+ absence games):
+        #   pts_delta = -33.58 × pra_share + 3.97
+        #   win_delta = -1.070 × pra_share + 0.120
+        # where pra_share = absent_player_projected_PRA / team_projected_PRA
+        #
+        # Predictions at key share levels:
+        #   10% share (role player):      +0.6 pts, +1.3% win (team barely changes)
+        #   16% share (solid starter):    -1.4 pts, -5.1% win
+        #   22% share (important piece):  -3.4 pts, -11.6% win
+        #   25% share (true star):        -4.4 pts, -14.8% win
+        #   28% share (Luka/Jokic level): -5.4 pts, -18.0% win
+        #
+        # Only applied for user-deactivated players (including injury=Out).
+        # DNP-defaults are excluded — they're already the expected baseline state.
+        _PTS_COEFF = -33.578
+        _PTS_CONST =   3.973
+        _WIN_COEFF =  -1.070
+        _WIN_CONST =   0.120
+        team_proj_pra = tp.proj_pts + tp.proj_reb + tp.proj_ast
+        if tp.proj_pts > 0 and team_proj_pra > 0:
+            total_pts_adj = 0.0
+            total_win_adj = 0.0
+            for p in projs:
+                if not getattr(p, "_user_deactivated", False):
+                    continue
+                base_min = max(getattr(p, "_base_min_for_share", 0.0), 1.0)
+                absent_pts = getattr(p, "_pts_pm_ewm_orig", 0.0) * base_min
+                absent_reb = getattr(p, "_reb_pm_ewm_orig", 0.0) * base_min
+                absent_ast = getattr(p, "_ast_pm_ewm_orig", 0.0) * base_min
+                absent_pra = absent_pts + absent_reb + absent_ast
+                pra_share  = float(np.clip(absent_pra / team_proj_pra, 0.0, 0.50))
+                total_pts_adj += _PTS_COEFF * pra_share + _PTS_CONST
+                total_win_adj += _WIN_COEFF * pra_share + _WIN_CONST
+            if total_pts_adj != 0.0:
+                new_pts = float(np.clip(tp.proj_pts + total_pts_adj,
+                                        tp.proj_pts * 0.60, tp.proj_pts * 1.05))
+                lineup_ratio = new_pts / tp.proj_pts
+                tp.proj_pts  = new_pts
+                tp.proj_reb  = tp.proj_reb  * lineup_ratio
+                tp.proj_ast  = tp.proj_ast  * lineup_ratio
+                tp.proj_fg3m = tp.proj_fg3m * lineup_ratio
+            if total_win_adj != 0.0:
+                # Store win adjustment on TeamProjection for post-reconcile application.
+                # Win probability is recomputed in NBAProjectionEngine.project() after
+                # both lineups are resolved, so we stash the delta here.
+                tp._lineup_win_adj = float(np.clip(total_win_adj, -0.45, 0.20))
+
+        # ── Stat reconciliation (rates × minutes → normalize to adjusted team total) ─
         for p in active:
             if not p._min_overridden:
                 if hasattr(p, "_pts_pm"):
@@ -1496,10 +1545,17 @@ class NBAProjectionEngine:
             is_home=False, is_b2b=a_is_b2b)
             if self.player_model else [])
 
-        # Recompute win probability after lineup adjustments may have changed
-        # h_proj.proj_pts / a_proj.proj_pts via _reconcile's natural-sum cap.
+        # Recompute win probability from adjusted team totals, then apply the
+        # per-team lineup win adjustments stored by _reconcile.
+        # The pts-based component (from the sigmoid) captures the scoring gap.
+        # The lineup win adjustment adds the portion of win-rate impact that
+        # isn't captured by pts alone (e.g. Jokic's defensive/playmaking value).
         pt_diff_adj = h_proj.proj_pts - a_proj.proj_pts
-        q_home_adj = float(1.0 / (1.0 + np.exp(-pt_diff_adj / 8.0)))
+        q_home_base = float(1.0 / (1.0 + np.exp(-pt_diff_adj / 8.0)))
+        h_win_adj = float(getattr(h_proj, "_lineup_win_adj", 0.0))
+        a_win_adj = float(getattr(a_proj, "_lineup_win_adj", 0.0))
+        # Home lineup weaker → subtract from home win prob; away weaker → add to home win prob
+        q_home_adj = float(np.clip(q_home_base + h_win_adj - a_win_adj, 0.02, 0.98))
         h_proj.proj_win_prob = q_home_adj
         a_proj.proj_win_prob = 1.0 - q_home_adj
 
