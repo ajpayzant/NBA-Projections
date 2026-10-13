@@ -32,6 +32,7 @@ import fetch
 import model
 import parse
 import pbp
+import store
 
 LIVE = C.DATA / "live"
 HORIZON_DAYS = 3
@@ -245,11 +246,12 @@ def lineups(state: dict, day: str, use_sources: bool = True) -> dict[str, dict]:
     return out
 
 
-OVERRIDE_FILE = C.OVERRIDES / "lineups.json"
-
-
 def load_overrides() -> dict:
-    return json.loads(OVERRIDE_FILE.read_text()) if OVERRIDE_FILE.exists() else {}
+    """Manual lineups, {"day:team": {...}}: a shared gist on the cloud, else a local file (store.py)."""
+    try:
+        return store.load()
+    except Exception:   # gist unreachable: project from the sources rather than fail
+        return {}
 
 
 def save_override(day: str, team: str, lineup: dict | None) -> None:
@@ -260,8 +262,7 @@ def save_override(day: str, team: str, lineup: dict | None) -> None:
     else:
         o[k] = {"avail": {str(p): x for p, x in lineup["avail"].items()}, "starters": lineup["starters"],
                 "minutes": {str(p): x for p, x in lineup.get("minutes", {}).items()}}
-    C.OVERRIDES.mkdir(parents=True, exist_ok=True)
-    OVERRIDE_FILE.write_text(json.dumps(o, indent=1))
+    store.save(o)
 
 
 # ---------------------------------------------------------------- projection

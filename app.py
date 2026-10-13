@@ -13,15 +13,26 @@ import pandas as pd
 import streamlit as st
 from scipy import stats
 
+import cloud
 import config as C
 import edges
 import linecheck
 import live
 import odds
+import store
 import tracking
 
 st.set_page_config(page_title="NBA Player Projections", layout="wide")
 PROJ, ACT, MUTED = "#2a78d6", "#eb6834", "#8a8984"   # same palette as the NHL tool
+
+
+@st.cache_data(ttl=600, show_spinner="Loading the latest projections...")
+def _sync() -> str | None:
+    """On Streamlit Cloud: pull the refresh workflow's newest files (no-op locally)."""
+    return cloud.sync()
+
+
+_sync()
 STATS = [("PTS", "pts"), ("REB", "reb"), ("AST", "ast"), ("3PM", "fg3m"), ("PRA", "pra"), ("P+R", "pr"), ("P+A", "pa"),
          ("R+A", "ra")]
 
@@ -404,7 +415,11 @@ def page_lineups():
     r = roster_info(team)
     usual = s["usual_min"].get(team, {})
     st.caption(f"Starters from **{l['source']}**. Edit who plays, who starts and anyone's minutes; Save updates every "
-               "projection for this team (minutes for the others are rescaled to fill the 240).")
+               "projection for this team (minutes for the others are rescaled to fill the 240). Saved lineups "
+               "are shared with everyone using the app.")
+    if cloud.enabled() and store.backend() == "file":
+        st.warning("Overrides are not connected to their gist (add gist_id and github_token to the app's secrets), "
+                   "so saves only last until the app restarts.")
     ed = pd.DataFrame({
         "player": r.player.astype(int), "Player": r.name, "Pos": r.pos.fillna(""),
         "Status": [l["why"].get(int(x), "") for x in r.player],

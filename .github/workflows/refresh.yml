@@ -1,0 +1,75 @@
+name: Refresh projections
+
+# Fetch finished NBA games, rebuild the tables, refit, cache the next few days' slate, and
+# publish the result to the release tagged `data`, which the Streamlit app downloads
+# (cloud.py). Data lives in the release, not in git, so the repo does not grow every run.
+# Run it by hand any time: Actions -> Refresh projections -> Run workflow.
+#
+# No odds credits are spent here: sportsbook odds are fetched only by the app's Refresh odds
+# button. Grading the Results tab against historical lines (python tracking.py grade, about
+# 200 credits per game) is switched on by setting the repository variable GRADE_RESULTS to
+# true and the secret ODDS_API_KEY.
+on:
+  schedule:
+    - cron: "0 14 * * *"    # 10:00 ET (9:00 in winter)
+    - cron: "0 19 * * *"    # 15:00 ET
+    - cron: "0 22 * * *"    # 18:00 ET, before the evening tip-offs
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "research/**"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUTF8: "1"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"   # must match the Streamlit app's Python (state.pkl is a pickle)
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Restore data from the last run
+        run: |
+          gh release download data -p bundle.tar -D dist
+          python publish.py unpack dist/bundle.tar
+          rm dist/bundle.tar
+
+      - name: Refresh and project
+        run: python live.py
+
+      - name: Results tracking (store today's final projections; no credits)
+        run: python tracking.py snapshot
+
+      - name: Grade finished days vs opening / closing lines (opt-in, spends odds credits)
+        if: ${{ vars.GRADE_RESULTS == 'true' }}
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: python tracking.py grade
+
+      - name: Pack
+        run: python publish.py pack
+
+      - name: Publish to the data release
+        run: |
+          gh release view data > /dev/null 2>&1 || \
+            gh release create data --title "Projection data" --notes "Written by the refresh workflow; read by the app. Do not edit."
+          # data files first, the manifest last, so the app never sees a manifest that points ahead of its files
+          gh release upload data dist/bundle.tar dist/state.pkl --clobber
+          if [ -f dist/results_live.parquet ]; then gh release upload data dist/results_live.parquet --clobber; fi
+          gh release upload data dist/manifest.json --clobber

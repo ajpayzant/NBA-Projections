@@ -54,3 +54,35 @@ markets). Historical prices are cached per day in `data/odds_hist/`, so no day i
 | `tracking.py` | Results: daily snapshots, grading at the opening and closing lines, historical backtest |
 | `app.py` | Streamlit app: Slate, Game, Lineups & minutes, Player, Edges, Results, How it works |
 | `research/` | tuning grid, nonlinear headroom check, distribution comparison |
+
+## Streamlit Cloud
+
+The app runs on Streamlit Cloud from this repo; the data does not live in git.
+
+- `.github/workflows/refresh.yml` runs three times a day (10:00, 15:00 and 18:00 ET), on every
+  push to main and by hand (Actions -> Refresh projections -> Run workflow). It restores the
+  history tables from the release tagged `data` (`bundle.tar`), fetches finished games, refits,
+  caches the next three days' slate and stores the day's projections for the Results tab, then
+  publishes `state.pkl`, `bundle.tar` and `manifest.json` back to that release (`publish.py`).
+- The deployed app checks the release every 10 minutes and downloads anything newer (`cloud.py`).
+- No odds credits are spent by the workflow. Grading the Results tab is opt-in: set the
+  repository variable `GRADE_RESULTS` to `true` and the secret `ODDS_API_KEY`.
+
+Deploying (share.streamlit.io -> Create app):
+
+| Setting | Value |
+|---|---|
+| Repository / branch / main file | `ajpayzant/NBA-Projections` / `main` / `app.py` |
+| Python version (Advanced settings) | **3.13** (it must match the workflow: `state.pkl` is a pickle) |
+
+Secrets (Advanced settings -> Secrets), TOML:
+
+```toml
+odds_api_key = "..."     # the Edges tab's Refresh odds button
+gist_id      = "..."     # optional: shared lineup overrides that survive app restarts
+github_token = "..."     # optional: fine-grained token with Gists read and write
+```
+
+Without `gist_id` / `github_token` the Lineups page still works, but saved overrides last only
+until the app restarts. The gist can be the NHL tool's: this tool writes its own file,
+`nba_lineups.json`.
