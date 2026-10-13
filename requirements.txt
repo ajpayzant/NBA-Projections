@@ -1,0 +1,10 @@
+pandas==3.0.6
+numpy==2.5.3
+pyarrow==25.0.1
+lightgbm==4.7.0
+statsmodels==0.15.0
+scipy==1.18.1
+requests==2.34.2
+streamlit==1.64.0
+altair==6.3.0
+tzdata==2026.4

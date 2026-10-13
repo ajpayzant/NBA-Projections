@@ -1,0 +1,9 @@
+.venv/
+.venv313/
+__pycache__/
+*.tmp
+.streamlit/secrets.toml
+data/
+dist/
+research/shots/
+research/edgeprof/
