@@ -130,23 +130,39 @@ def fair_line(row, s: str) -> float:
 
 # ---------------------------------------------------------------- tables
 
+# prop columns, in display order: (header, probability column). Shown as a % bar, or as the
+# fair (no-vig) American price for the over when the sidebar is set to Fair odds (as in the NHL tool)
+PROP_COLS = [*[(f"o{x:g} PTS", f"p_pts_{x}") for x in (9.5, 14.5, 19.5, 24.5, 29.5)],
+             *[(f"o{x:g} REB", f"p_reb_{x}") for x in (4.5, 7.5, 9.5, 11.5)],
+             *[(f"o{x:g} AST", f"p_ast_{x}") for x in (3.5, 5.5, 7.5, 9.5)],
+             *[(f"o{x:g} 3PM", f"p_fg3m_{x}") for x in (1.5, 2.5, 3.5)],
+             ("Double-double", "p_dd"), ("Triple-double", "p_td")]
+PROP_NAMES = [h for h, _ in PROP_COLS]
+
+
 def player_table(p: pd.DataFrame, with_team: bool = True) -> pd.DataFrame:
     t = p.sort_values(["team", "starter", "min_hat"], ascending=[True, False, False])
     out = pd.DataFrame({
         "Team": t.team, "Player": t["name"], "Pos": t.pos.fillna(""), "Start": np.where(t.starter, "S", ""),
         "MIN": t.min_hat, "PTS": t.pts_hat, "REB": t.reb_hat, "AST": t.ast_hat, "3PM": t.fg3m_hat, "PRA": t.pra_hat,
-        **{f"{lab} line": [fair_line(r, s) for _, r in t.iterrows()] for lab, s in STATS[:5]}})
+        **{h: t[c] for h, c in PROP_COLS}})
     return out if with_team else out.drop(columns=["Team"])
 
 
 def show(t: pd.DataFrame, height="auto"):
+    t = t.copy()
+    pcols = [c for c in t.columns if c in PROP_NAMES]
+    if odds_mode():  # same columns, shown as the fair price for the over
+        for c in pcols:
+            t[c] = t[c].map(american)
+        pcols = []
+    else:
+        t[pcols] = (t[pcols] * 100).round()
     cfg = {c: st.column_config.NumberColumn(format="%.1f", width="small") for c in ("MIN", "PTS", "REB", "AST", "PRA")}
     cfg["3PM"] = st.column_config.NumberColumn(format="%.2f", width="small")
-    cfg |= {c: st.column_config.NumberColumn(format="%g", width="small",
-                                             help="Fair line: the x.5 line closest to a coin flip by the model")
-            for c in t.columns if c.endswith(" line")}
-    cfg |= {c: st.column_config.TextColumn(width="small", pinned=c in ("Team",)) for c in ("Team", "Pos", "Start")}
+    cfg |= {c: st.column_config.TextColumn(width="small", pinned=c == "Team") for c in ("Team", "Pos", "Start")}
     cfg["Player"] = st.column_config.TextColumn("Player", pinned=True)
+    cfg |= {c: st.column_config.ProgressColumn(format="%d%%", min_value=0, max_value=100, width="small") for c in pcols}
     st.dataframe(t, hide_index=True, column_config=cfg, width="stretch", height=height)
 
 
@@ -262,6 +278,7 @@ def team_points(g) -> dict:
 def page_slate():
     s = state() or no_state()
     day = pick_day(s)
+    odds_toggle()
     st.title(f"Slate · {day}")
     p = projections(day)
     if p.empty:
@@ -293,13 +310,14 @@ def page_slate():
     c1, c2, c3 = st.columns([2, 2, 1])
     teams = c1.multiselect("Teams", sorted(p.team.unique()))
     pos = c2.multiselect("Position", ["G", "F", "C"])
-    sort = c3.selectbox("Sort by", ["PTS", "REB", "AST", "3PM", "PRA", "MIN"])
+    sort = c3.selectbox("Sort by", ["PTS", "REB", "AST", "3PM", "PRA", "MIN"] + PROP_NAMES)
     q = p[p.team.isin(teams)] if teams else p
     q = q[q.grp.isin(pos)] if pos else q
     t = player_table(q).sort_values(sort, ascending=False)
     st.caption(f"{p.game_id.nunique()} games · {len(t)} players projected to play · built {s['built_at']}")
     show(t, height=720)
-    st.caption("Projections are for a player who plays (books void a prop otherwise). Lines are the model's fair lines.")
+    st.caption("Projections and probabilities are for a player who plays (books void a prop otherwise). "
+               "Every player's full prop ladder, at any line, is on the Player page.")
     st.download_button("Download CSV", t.to_csv(index=False), f"nba_projections_{day}.csv", "text/csv")
 
 
@@ -327,6 +345,7 @@ def page_game():
     s = state() or no_state()
     day = pick_day(s)
     g = pick_game(day)
+    odds_toggle()
     p = projections(day)
     p = p[p.game_id == g.game_id]
     lu = lineups(day)
@@ -459,6 +478,8 @@ def page_player():
     for c, (t, v) in zip(cols, [("Minutes", r.min_hat), ("Points", r.pts_hat), ("Rebounds", r.reb_hat),
                                 ("Assists", r.ast_hat), ("3-pointers", r.fg3m_hat), ("PRA", r.pra_hat)]):
         c.metric(t, f"{v:.1f}", border=True)
+    st.caption(f"Double-double **{r.p_dd:.1%}** (fair {american(r.p_dd)}) · Triple-double **{r.p_td:.1%}** "
+               f"(fair {american(r.p_td)}) · for a game he plays")
     cur = h[h.season == C.CURRENT_SEASON]
     last = h[(h.season == C.CURRENT_SEASON - 1) & (h.season_type == 2)]
     wins = (("Last 10", h.tail(10)), ("This season", cur), ("Last season", last), ("Last 3 seasons", h[h.season_type == 2]))
@@ -524,7 +545,7 @@ def page_player():
                    f"Orange line: tonight's projection ({proj_v:.1f}). Dashed: the line.")
     else:
         st.info("No NBA games in the data for him yet.")
-    t1, t2 = st.tabs(["Recent games", "Season by season"])
+    t1, t2, t3 = st.tabs(["Recent games", "Season by season", "Splits"])
     with t1:
         rec = h.tail(15).iloc[::-1]
         st.dataframe(pd.DataFrame({"Date": pd.to_datetime(rec.date).dt.strftime("%Y-%m-%d"),
@@ -537,6 +558,47 @@ def page_player():
                            "AST": reg.ast.mean(), "3PM": reg.fg3m.mean(), "PRA": reg.pra.mean()})
         ss.index = [f"{y}-{str(y + 1)[2:]}" for y in ss.index]
         st.dataframe(ss.iloc[::-1].style.format("{:.1f}", subset=["MIN", "PTS", "REB", "AST", "3PM", "PRA"]), width="stretch")
+    with t3:
+        splits(h, r, s)
+
+
+def splits(h: pd.DataFrame, r, s: dict):
+    """Home / away, starter / bench, rest days and career vs tonight's opponent: per-game averages
+    and how often he went over tonight's fair points line."""
+    recent = h[h.season >= C.CURRENT_SEASON - 1]
+    allg = s["history_games"].drop_duplicates(["team", "date"])[["team", "date"]].sort_values("date")
+    allg["rest"] = allg.groupby("team").date.transform(lambda x: pd.to_datetime(x).diff().dt.days)
+    rest = dict(zip(zip(allg.team, allg.date), allg.rest))
+    recent = recent.assign(rest=[rest.get((t, d)) for t, d in zip(recent.team, recent.date)])
+    fl = fair_line(r, "pts")
+    line_col = f"o{fl:g} PTS"
+
+    def split(df, by, label):
+        g = df.groupby(by)
+        out = pd.DataFrame({"GP": g.size(), "MIN": g["min"].mean(), "PTS": g.pts.mean(), "REB": g.reb.mean(),
+                            "AST": g.ast.mean(), "3PM": g.fg3m.mean(), "PRA": g.pra.mean(),
+                            line_col: g.pts.apply(lambda x: (x > fl).mean())})
+        out.index = [f"{label}: {k}" for k in out.index]
+        return out
+    rest_lab = np.select([recent.rest == 1, recent.rest == 2], ["back-to-back", "1 day"], "2+ days")
+    parts = [split(recent.assign(k=np.where(recent.is_home, "home", "away")), "k", "Venue"),
+             split(recent.assign(k=np.where(recent.starter, "starter", "bench")), "k", "Role"),
+             split(recent.assign(k=rest_lab), "k", "Rest")]
+    vs = h[h.opp == r.opp]
+    if len(vs):
+        parts.append(split(vs.assign(k=r.opp), "k", "Career vs"))
+    t = pd.concat([x for x in parts if len(x)]) if any(len(x) for x in parts) else pd.DataFrame()
+    if t.empty:
+        st.info("No games yet.")
+        return
+    st.dataframe(t, width="stretch", column_config={
+        **{c: st.column_config.NumberColumn(format="%.1f") for c in ("MIN", "PTS", "REB", "AST", "PRA")},
+        "3PM": st.column_config.NumberColumn(format="%.2f"),
+        line_col: st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1,
+                                                  help="How often he went over tonight's fair points line")})
+    first = pd.to_datetime(s["history_games"].date).min()
+    st.caption(f"Venue, role and rest splits cover last season and this season; 'Career vs' covers every game in the data "
+               f"(since {first:%Y}). {line_col} = tonight's fair points line.")
 
 
 # ---------------------------------------------------------------- How it works

@@ -279,6 +279,7 @@ def project(state: dict, day: str, lu: dict[str, dict]) -> pd.DataFrame:
     plain = model.predict_stats(d, d.min_hat, co["stats"], boost=False)
     d["pts_plain"] = plain.pts_hat
     probs = {f"p_{st_}_{ln}": model.prob_over(d[f"{st_}_hat"], co["alpha"][st_], ln) for st_ in LINES for ln in LINES[st_]}
+    probs["p_dd"], probs["p_td"] = model.double_triple(probs["p_pts_9.5"], probs["p_reb_9.5"], probs["p_ast_9.5"])
     return pd.concat([d, pd.DataFrame(probs, index=d.index)], axis=1)
 
 

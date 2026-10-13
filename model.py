@@ -317,3 +317,25 @@ def save(co: dict, name: str = "coefs.json") -> None:
 
 def load(name: str = "coefs.json") -> dict:
     return json.loads((C.MODELS / name).read_text())
+
+
+# ---------------------------------------------------------------- double- and triple-doubles
+
+# Points, rebounds and assists move together (a big-minutes night lifts all three), so treating
+# them as independent understates both: 7.1% predicted vs 8.2% actual double-doubles, 0.31% vs
+# 0.51% triple-doubles (backtest 2021-26). A logistic calibration of the independent probability,
+# fitted on the walk-forward backtest's out-of-sample projections, corrects it (held-out 2024-26
+# log loss: DD 0.1859 -> 0.1842, TD 0.0208 -> 0.0197).
+DD_CAL = {"dd": (0.0016, 0.8671), "td": (0.0571, 0.8315)}
+
+
+def double_triple(p_pts, p_reb, p_ast) -> tuple[np.ndarray, np.ndarray]:
+    """P(double-double), P(triple-double) from each stat's P(10+), calibrated."""
+    p, r, a = (np.clip(np.asarray(x, float), 1e-6, 1 - 1e-6) for x in (p_pts, p_reb, p_ast))
+    ind = {"dd": p * r + p * a + r * a - 2 * p * r * a, "td": p * r * a}
+    out = []
+    for k in ("dd", "td"):
+        q = np.clip(ind[k], 1e-6, 1 - 1e-6)
+        c0, c1 = DD_CAL[k]
+        out.append(1 / (1 + np.exp(-(c0 + c1 * np.log(q / (1 - q))))))
+    return out[0], out[1]
