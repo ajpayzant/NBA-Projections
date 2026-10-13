@@ -39,6 +39,7 @@ K_RATE = 120              # minutes of position-group production in every player
 POS_GROUP = {"PG": "G", "SG": "G", "G": "G", "SF": "F", "PF": "F", "F": "F", "C": "C"}
 PRIOR_SEASONS = (2018,)   # position-group levels come only from these seasons
 ALLOW = ["pts", "reb", "ast", "fg3m"]
+LAST_PAIRS: dict = {}     # the with/without pair states from the last build (for live.py)
 
 
 ONC_COLS = ["sec_on", "on_fga", "on_fta", "on_tov", "on_fgm", "on_pts", "on_reb", "on_opp_pts", "on_poss"]
@@ -60,8 +61,7 @@ def prep(pg: pd.DataFrame, tg: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
     pg = pg.copy()
     pg["date"] = pd.to_datetime(pg.date)
     pg["avail"] = available(pg)
-    if "pending" not in pg:
-        pg["pending"] = False
+    pg["pending"] = pg.get("pending", pd.Series(False, index=pg.index)).fillna(False).astype(bool)
     pg = pg[pg.avail | pg.pending].copy()
     pg["min"] = pg["min"].fillna(0.0).where(~pg.dnp, 0.0)
     for s in STATS[:-1]:
@@ -79,8 +79,7 @@ def prep(pg: pd.DataFrame, tg: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
     tg = tg.copy()
     tg["date"] = pd.to_datetime(tg.date)
     tg["reb"] = tg.oreb + tg.dreb       # ESPN's team total adds team rebounds in 2018-21
-    if "pending" not in tg:
-        tg["pending"] = False
+    tg["pending"] = tg.get("pending", pd.Series(False, index=tg.index)).fillna(False).astype(bool)
     tg = tg.sort_values(["date", "game_id"]).reset_index(drop=True)
     return pg, tg
 
@@ -220,6 +219,15 @@ def position_defence(pg: pd.DataFrame, env: dict) -> pd.DataFrame:
     for s in ALLOW:
         k = 20 * g[f"x_{s}"].mean()
         out[f"pos_allow_{s}"] = (e[s] + k) / (e[f"x_{s}"] + k)
+    pend = pg[pg.pending][["game_id", "opp", "grp"]].drop_duplicates()
+    if len(pend):   # tonight: each defence's state after its latest game
+        last = ew.latest(g, "key", ALLOW + [f"x_{s}" for s in ALLOW], HL_TEAM, GAP)
+        k_ = pend.opp + "|" + pend.grp
+        add = pend.copy()
+        for s in ALLOW:
+            k = 20 * g[f"x_{s}"].mean()
+            add[f"pos_allow_{s}"] = ((last[s] + k) / (last[f"x_{s}"] + k)).reindex(k_).to_numpy()
+        out = pd.concat([out, add], ignore_index=True)
     return out
 
 
@@ -282,10 +290,12 @@ def build(pg: pd.DataFrame, tg: pd.DataFrame) -> pd.DataFrame:
     # player-specific: how his usage share moves when each absent rotation player is off the court
     import wowy
     states = wowy.pair_states(pg[["game_id", "date"]].drop_duplicates("game_id"))
+    states_m = wowy.minutes_states(pg[~pg.pending])
+    LAST_PAIRS["usg"], LAST_PAIRS["min"] = states, states_m      # reused by live.py
     miss = f.missing_ids.apply(lambda x: x if isinstance(x, list) else [])
     f["wowy_usg"] = wowy.wowy_feature(f, miss, states)
     # and how many more minutes he has played in earlier games those teammates missed
-    f["wowy_min"] = wowy.wowy_feature(f, miss, wowy.minutes_states(pg[~pg.pending]))
+    f["wowy_min"] = wowy.wowy_feature(f, miss, states_m)
     # team-ratings view of the game: possessions x league points per possession x offence x
     # the other side's defence, for this team and for the opponent
     poss = f.lg_pace * f.pace_rel * f.opp_pace_rel
