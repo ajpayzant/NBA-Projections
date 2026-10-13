@@ -6,11 +6,17 @@
    A team's projected minutes are then scaled to add up to 240 plus expected overtime.
 2. Stats (Poisson GLM with offset log(minutes x his per-minute rate)): game pace vs league,
    what the opponent allows of that stat, home, rest, the usage freed by absent teammates,
-   playoffs, and a 'spread' term (log of his base vs a typical base) that corrects the
+   playoffs, and a 'spread' term (log of his league-relative rate) that corrects the
    history-only base where it is too regressed or not enough.
 3. Distributions: negative binomial for each stat and each combo (PRA, P+R, P+A, R+A), with
    the overdispersion fitted on the training games (method of moments).
-4. Team score: the summed player points, recalibrated, with normal margin and total errors.
+4. Boosted corrections: a regularised LightGBM, fitted on the training seasons only, corrects
+   what the transparent models systematically miss (minutes curvature, short histories).
+5. Team score: a fitted blend of the summed (unboosted) player points and team ratings, with
+   normal margin and total errors.
+
+Everything is league-relative (features.py), so scoring and 3-point drift across eras do not
+bias the projections.
 """
 from __future__ import annotations
 
@@ -25,7 +31,6 @@ import config as C
 
 STAT_COLS = ["pts", "reb", "ast", "fg3m"]
 COMBOS = {"pra": ["pts", "reb", "ast"], "pr": ["pts", "reb"], "pa": ["pts", "ast"], "ra": ["reb", "ast"]}
-TYPICAL = {"pts": 0.45, "reb": 0.18, "ast": 0.10, "fg3m": 0.045}   # per-minute rates of a typical player
 EXP_MIN = 240 + 25 * 0.06    # regulation + expected overtime (about 6% of games, 25 player-minutes each)
 CEILING = 40.0               # above this, a player takes almost none of a team's spare minutes
 
@@ -49,22 +54,62 @@ def prepare(f: pd.DataFrame) -> pd.DataFrame:
     # usage freed by absent teammates: how much of the team's usual usage is missing, and how
     # that interacts with his own usage (high-usage players absorb more, but not without limit)
     d["miss_usg_share"] = np.log1p(d.miss_usg.fillna(0) / usg_min.where(usg_min > 0)).fillna(0)
-    d["rel_usg"] = np.log((d.r_usg / d.r_usg.mean()).clip(0.3, 3))
-    d["usg_boost"] = d.miss_usg_share * d.rel_usg
+    d["lrel_usg"] = np.log(d.rel_usg.clip(0.3, 3))          # his usage vs the league, log
+    d["usg_boost"] = d.miss_usg_share * d.lrel_usg
     d["blowout"] = d.proj_margin.abs().fillna(0)
     d["b2b"] = (d.rest == 1).astype(float)
     d["opp_b2b"] = (d.opp_rest == 1).astype(float)
     d["po"] = (d.season_type == 3).astype(float)
-    lg_pace = d.pace.mean()
-    d["pace_g"] = np.log(((d.pace + d.opp_pace) / 2 / lg_pace).fillna(1.0))
+    d["pace_g"] = np.log((d.pace_rel * d.opp_pace_rel).fillna(1.0))   # game pace vs the league, log
     return d
+
+
+# ---------------------------------------------------------------- boosted corrections
+# After the transparent models, a regularised LightGBM learns what they systematically miss
+# (curvature in recent minutes, players with little history, interactions), fitted on the
+# training seasons only. research/nonlinear.py measured the headroom: minutes -3.3%, points -0.9%.
+
+BOOST_FEATS = ["ew_min_s", "ew_min_l", "ew_min_start", "ew_min_bench", "start_rate", "starter", "is_home", "rest",
+               "opp_rest", "pace_rel", "opp_pace_rel", "ortg_rel", "drtg_rel", "opp_ortg_rel", "opp_drtg_rel", "miss_min",
+               "miss_usg", "miss_usg_share", "absorb", "wowy_usg", "wowy_min", "blowout", "g3in4", "gp_w", "hist_min",
+               "rel_pts", "rel_reb", "rel_ast", "rel_fg3m", "rel_usg", "rel_fga", "rel_fta", "rel_oreb", "rel_dreb",
+               "sh_usg", "sh_reb", "sh_ast", "pts_per_usg", "opp_allow_pts", "opp_allow_reb", "opp_allow_ast",
+               "opp_allow_fg3m", "pos_allow_pts", "pos_allow_reb", "pos_allow_ast", "proj_margin", "po"]
+BOOST_PARAMS = {"learning_rate": 0.03, "num_leaves": 31, "min_data_in_leaf": 400, "feature_fraction": 0.8,
+                "bagging_fraction": 0.8, "bagging_freq": 1, "lambda_l2": 10, "verbose": -1, "seed": 7}
+
+
+def _bX(d: pd.DataFrame, base: pd.Series) -> pd.DataFrame:
+    X = d[[c for c in BOOST_FEATS if c in d]].astype(float).copy()
+    X["base"] = base.astype(float)
+    return X
+
+
+def fit_boost(d: pd.DataFrame, y: pd.Series, base: pd.Series, objective: str, rounds: int = 300):
+    import lightgbm as lgb
+    X = _bX(d, base)
+    init = np.log(base.clip(0.05)) if objective == "poisson" else base
+    ds = lgb.Dataset(X, y.astype(float), init_score=init.to_numpy())
+    return lgb.train({**BOOST_PARAMS, "objective": objective}, ds, num_boost_round=rounds)
+
+
+def apply_boost(booster, d: pd.DataFrame, base: pd.Series, objective: str) -> pd.Series:
+    raw = booster.predict(_bX(d, base), raw_score=True)
+    out = base * np.exp(raw) if objective == "poisson" else base + raw
+    return pd.Series(np.asarray(out), index=d.index)
 
 
 # ---------------------------------------------------------------- minutes
 
 def _min_X(d: pd.DataFrame) -> pd.DataFrame:
+    ab = d.absorb.fillna(0)
     return pd.DataFrame({"const": 1.0, "ew_min_s": d.ew_min_s, "ew_min_l": d.ew_min_l, "role_min": d.role_min,
-                         "start_rate": d.start_rate, "absorb": d.absorb.fillna(0), "blowout": d.blowout,
+                         "start_rate": d.start_rate, "absorb": ab,
+                         # who absorbs an absent teammate's minutes is not simply proportional:
+                         # high-usage players and players with a lot of room take different shares
+                         "absorb_usg": ab * d.lrel_usg, "absorb_min": ab * d.ew_min_l / 30, "absorb2": np.sqrt(ab),
+                         "wowy_min": d.wowy_min.fillna(0).clip(-15, 15),   # his own history without them
+                         "blowout": d.blowout, "g3in4": d.g3in4.fillna(0) * d.ew_min_l / 30,
                          "b2b": d.b2b, "po": d.po, "po_min": d.po * d.ew_min_l,
                          "ew_min_l2": d.ew_min_l ** 2 / 40}, index=d.index)
 
@@ -86,6 +131,8 @@ def fit_minutes(d: pd.DataFrame) -> dict:
     b = d[~d.starter]
     lg = sm.Logit(played[~d.starter].astype(float), _play_X(b)).fit(disp=0)
     co["play"] = dict(zip(_play_X(b).columns, map(float, lg.params)))
+    m_lin, _ = predict_minutes(d, {**co, "boost": None}, normalise=False)
+    co["boost"] = fit_boost(d[played], d.loc[played, "min"], m_lin[played], "regression")
     m_if, p_play = predict_minutes(d, co, normalise=False)
     resid = (d["min"] - m_if)[played]
     co["sd"] = {"start": float(resid[d.starter].std()), "bench": float(resid[~d.starter].std())}
@@ -99,6 +146,8 @@ def predict_minutes(d: pd.DataFrame, co: dict, normalise: bool = True) -> tuple[
     for role, m in (("start", d.starter), ("bench", ~d.starter)):
         X = _min_X(d[m])
         m_if[m] = X.to_numpy() @ np.array([co[role][c] for c in X.columns])
+    if co.get("boost") is not None:
+        m_if = apply_boost(co["boost"], d, m_if, "regression")
     m_if = m_if.clip(1, 46)
     Xp = _play_X(d)
     p_play = pd.Series(1 / (1 + np.exp(-(Xp.to_numpy() @ np.array([co["play"][c] for c in Xp.columns])))), index=d.index)
@@ -121,11 +170,24 @@ def predict_minutes(d: pd.DataFrame, co: dict, normalise: bool = True) -> tuple[
 def _stat_X(d: pd.DataFrame, s: str, base: pd.Series) -> pd.DataFrame:
     X = pd.DataFrame({"const": 1.0, "pace": d.pace_g, "home": d.is_home.astype(float), "b2b": d.b2b,
                       "opp_b2b": d.opp_b2b, "miss_usg": d.miss_usg_share, "usg_boost": d.usg_boost, "po": d.po,
-                      "spread": np.log((d[f"r_{s}"].clip(1e-4)) / TYPICAL[s])}, index=d.index)
+                      "spread": np.log(d[f"rel_{s}"].clip(0.05, 20))}, index=d.index)
     X["spread2"] = X.spread ** 2       # production flattens at the extremes (a log-linear fit over-reaches)
     X["min_lvl"] = np.log((base / d[f"r_{s}"].clip(1e-4)).clip(1, 48) / 24)   # minutes level: per-minute output is not constant across roles
     if s in ("pts", "reb", "ast", "fg3m"):
         X["opp"] = np.log(d[f"opp_allow_{s}"].clip(0.7, 1.4)).fillna(0)
+        if s in ("reb", "ast"):   # what it allows to HIS position group, beyond its overall level
+            X["opp_pos"] = (np.log(d[f"pos_allow_{s}"].clip(0.6, 1.6)) - X["opp"]).fillna(0)
+    X["g3in4"] = d.g3in4.fillna(0)
+    # play-by-play view: minutes x tonight's opportunities per minute x his share of them,
+    # entered as its log ratio to the per-minute base so the fit decides how much it adds
+    mins = base / d[f"r_{s}"].clip(1e-4)
+    alt = {"reb": mins * d.reb_opps_min * d.sh_reb,
+           "ast": mins * d.fgm_opps_min * d.sh_ast,
+           "pts": mins * d.opp_poss_min * d.sh_usg * d.pts_per_usg}.get(s)
+    if alt is not None:
+        X["alt"] = np.log((alt / base).clip(0.25, 4)).fillna(0)
+    if s in ("pts", "ast", "fg3m"):     # his own with/without-teammate usage response (play-by-play)
+        X["wowy"] = d.wowy_usg.fillna(0).clip(-1, 1)
     return X
 
 
@@ -149,10 +211,14 @@ def fit_stats(d: pd.DataFrame, min_hat: pd.Series) -> dict:
         H = _top_X(mu.to_numpy(), knots)
         c = sm.GLM(d[s].to_numpy(), H, family=sm.families.Poisson(), offset=np.log(mu.to_numpy())).fit()
         co[s]["_top"] = {"knots": knots, "coef": list(map(float, c.params))}
+        mu = mu * np.exp(H @ c.params)
+        co[s]["_boost"] = fit_boost(d, d[s], pd.Series(np.asarray(mu), index=d.index), "poisson")
     return co
 
 
-def predict_stats(d: pd.DataFrame, min_hat: pd.Series, co: dict) -> pd.DataFrame:
+def predict_stats(d: pd.DataFrame, min_hat: pd.Series, co: dict, boost: bool = True) -> pd.DataFrame:
+    """boost=False gives the transparent models' means, for the team-total blend: boosted means
+    are partly memorised on the training seasons, so a blend fitted on them over-trusts them."""
     out = pd.DataFrame(index=d.index)
     for s in STAT_COLS:
         base = (min_hat * d[f"r_{s}"]).clip(1e-3)
@@ -161,6 +227,8 @@ def predict_stats(d: pd.DataFrame, min_hat: pd.Series, co: dict) -> pd.DataFrame
         top = co[s].get("_top")
         if top:
             mu = mu * np.exp(_top_X(mu.to_numpy(), top["knots"]) @ np.array(top["coef"]))
+        if boost and co[s].get("_boost") is not None:
+            mu = apply_boost(co[s]["_boost"], d, pd.Series(np.asarray(mu), index=d.index), "poisson")
         out[f"{s}_hat"] = mu
     for c, parts in COMBOS.items():
         out[f"{c}_hat"] = sum(out[f"{p}_hat"] for p in parts)
@@ -176,7 +244,7 @@ def _var_fit(y, mu) -> tuple[float, float]:
     y, mu = np.asarray(y, float), np.asarray(mu, float)
     X = np.column_stack([mu, mu ** 2])
     c1, c2 = np.linalg.lstsq(X, (y - mu) ** 2, rcond=None)[0]
-    return float(max(c1, 0.5)), float(max(c2, 0.0))
+    return float(max(c1, 0.5)), float(max(c2, -0.5 * c1 / max(float(np.quantile(mu, 0.99)), 1.0)))
 
 
 def fit_alpha(d: pd.DataFrame, p: pd.DataFrame) -> dict:

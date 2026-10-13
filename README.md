@@ -22,6 +22,7 @@ network; Basketball-Reference is reachable but rate-limited by its terms, so it 
 ```
 .venv\Scripts\python fetch.py        # download / update ESPN game summaries
 .venv\Scripts\python parse.py        # raw -> lake tables
+.venv\Scripts\python pbp.py          # play-by-play -> on-court tables
 .venv\Scripts\python backtest.py     # walk-forward 2021-26, prints the report
 ```
 
@@ -30,7 +31,10 @@ network; Basketball-Reference is reachable but rate-limited by its terms, so it 
 | File | Role |
 |---|---|
 | `fetch.py`, `parse.py` | ESPN summaries -> player_games, team_games, injuries tables |
+| `pbp.py` | play-by-play -> on-court lineups (checked: 96-99.9% of player-games within 1 min of the box) and per-player on-court totals and stints |
+| `wowy.py` | with / without: each player's usage and minutes when a specific teammate is off the court or out |
 | `ew.py` | exponentially weighted running sums (the only way history enters) |
 | `features.py` | pregame features: minutes, per-minute rates, pace, opponent defence, absences |
-| `model.py` | minutes (if he plays + chance he plays), stats (Poisson GLM), distributions, scores |
+| `model.py` | minutes (if he plays + chance he plays), stats (Poisson GLM), boosted corrections, distributions, game lines |
 | `backtest.py` | walk-forward evaluation vs season-average and last-10 baselines |
+| `research/` | tuning grid, nonlinear headroom check, distribution comparison |

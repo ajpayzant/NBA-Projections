@@ -1,0 +1,182 @@
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'base', 'mae_pts': 4.443662752336074, 'mae_reb': 1.8425248048493352, 'mae_ast': 1.289860277690431, 'mae_fg3m': 0.8617026644596146, 'mae_pra': 5.787016654774483, 'mae_min': 4.597883159307903, 'ml_logloss': 0.6158272683104553, 'total_mae': 15.053492199466826}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_RATE=15', 'mae_pts': 4.470736773461621, 'mae_reb': 1.8442909315637284, 'mae_ast': 1.2900563173548185, 'mae_fg3m': 0.8649496353245147, 'mae_pra': 5.792648973639994, 'mae_min': 4.5976852813344244, 'ml_logloss': 0.615446108335312, 'total_mae': 15.235507143118845}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_RATE=40', 'mae_pts': 4.459174454896975, 'mae_reb': 1.843739472320988, 'mae_ast': 1.2929762006765804, 'mae_fg3m': 0.8614878132156051, 'mae_pra': 5.808916216597667, 'mae_min': 4.598010047826258, 'ml_logloss': 0.6160993393736723, 'total_mae': 15.161480688784213}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'K_RATE=60', 'mae_pts': 4.4647643844005005, 'mae_reb': 1.8419436498559763, 'mae_ast': 1.2890419830427182, 'mae_fg3m': 0.8596841577954315, 'mae_pra': 5.812558218730787, 'mae_min': 4.597961538139362, 'ml_logloss': 0.6159956326950042, 'total_mae': 15.614489609995438}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'K_RATE=240', 'mae_pts': 4.796631277257504, 'mae_reb': 1.8435075417472484, 'mae_ast': 1.3733346744112016, 'mae_fg3m': 0.8660635423863816, 'mae_pra': 6.213037088193598, 'mae_min': 4.597767576439024, 'ml_logloss': 0.6162325865628939, 'total_mae': 18.268475986898462}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_MIN=(3, 10)', 'mae_pts': 4.446692128742163, 'mae_reb': 1.8429105664659555, 'mae_ast': 1.2899195427446386, 'mae_fg3m': 0.8618304498093617, 'mae_pra': 5.791277357809439, 'mae_min': 4.59959205308163, 'ml_logloss': 0.6156409343830856, 'total_mae': 15.087605668865658}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_MIN=(6, 25)', 'mae_pts': 4.444176543577167, 'mae_reb': 1.843677658768564, 'mae_ast': 1.290365040731177, 'mae_fg3m': 0.8618438529659421, 'mae_pra': 5.78925623667808, 'mae_min': 4.611174588085906, 'ml_logloss': 0.6160289005655692, 'total_mae': 15.015818364445463}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_ROLE=6', 'mae_pts': 4.442762330119945, 'mae_reb': 1.8419622879717377, 'mae_ast': 1.2897418791760953, 'mae_fg3m': 0.8616257408036968, 'mae_pra': 5.784814777073791, 'mae_min': 4.59240596911536, 'ml_logloss': 0.6158518107282326, 'total_mae': 15.04943649426009}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_ROLE=20', 'mae_pts': 4.444402101475618, 'mae_reb': 1.8428159386876333, 'mae_ast': 1.2897917770635923, 'mae_fg3m': 0.8617565876543047, 'mae_pra': 5.788429079807914, 'mae_min': 4.6039513637454, 'ml_logloss': 0.6158273453265986, 'total_mae': 15.050784069835853}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'GAP=5', 'mae_pts': 4.4493284013350225, 'mae_reb': 1.8443992270612355, 'mae_ast': 1.2913356619874496, 'mae_fg3m': 0.8616348752169223, 'mae_pra': 5.797277175805312, 'mae_min': 4.612499340809195, 'ml_logloss': 0.6168269121586857, 'total_mae': 15.02903816819498}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'GAP=30', 'mae_pts': 4.442789763888329, 'mae_reb': 1.8430459466717661, 'mae_ast': 1.2902411889411163, 'mae_fg3m': 0.8627099264093815, 'mae_pra': 5.784212379541643, 'mae_min': 4.602268613343464, 'ml_logloss': 0.615430093779539, 'total_mae': 15.00294590567614}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_TEAM=12', 'mae_pts': 4.443078184614023, 'mae_reb': 1.8426716208245786, 'mae_ast': 1.289744475035606, 'mae_fg3m': 0.8619197905419514, 'mae_pra': 5.785701356210305, 'mae_min': 4.598291198930919, 'ml_logloss': 0.6176541941288203, 'total_mae': 15.049953762303572}
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:295: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["proj_margin"] = f.team_pts_rt - f.opp_pts_rt + 2.0 * home
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:299: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["opp_poss_min"] = poss / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:302: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["reb_opps_min"] = poss * (miss_tm + miss_op) / 48
+C:\Users\a.payzant\OneDrive - DK Crown Holdings Inc\Documents\GitHub\NBA_Player_Game_Projections\features.py:303: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  f["fgm_opps_min"] = poss * f.lg_fgm * f.fgm_rel * f.opp_drtg_rel / 48
+2021: fitted on [np.int64(2019), np.int64(2020)], 33,216 test rows
+2022: fitted on [np.int64(2019), np.int64(2020), np.int64(2021)], 33,515 test rows
+2023: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022)], 34,164 test rows
+2024: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023)], 33,868 test rows
+2025: fitted on [np.int64(2019), np.int64(2020), np.int64(2021), np.int64(2022), np.int64(2023), np.int64(2024)], 33,642 test rows
+{'trial': 'HL_TEAM=35', 'mae_pts': 4.445560721942346, 'mae_reb': 1.842545854655489, 'mae_ast': 1.2902553493978683, 'mae_fg3m': 0.861612617649598, 'mae_pra': 5.790575456599847, 'mae_min': 4.597838324597, 'ml_logloss': 0.6185824431670409, 'total_mae': 15.129160684229493}

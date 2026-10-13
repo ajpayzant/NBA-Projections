@@ -58,7 +58,8 @@ def run() -> pd.DataFrame:
         p_tr = model.predict_stats(tr, mh_tr, co_st)
         alpha = model.fit_alpha(tr[tr["min"] > 0], p_tr[tr["min"] > 0])
         _, pp_tr = model.predict_minutes(tr, co_min)
-        g_tr = model.game_table(tr, p_tr.pts_hat * pp_tr)
+        plain_tr = model.predict_stats(tr, mh_tr, co_st, boost=False)      # not memorised on these seasons
+        g_tr = model.game_table(tr, plain_tr.pts_hat * pp_tr)
         res = _results(g_tr, tg)
         co_sc = model.fit_scores(g_tr, res.margin.to_numpy(), res.total.to_numpy())
         te["min_hat"], te["p_play"] = model.predict_minutes(te, co_min)
@@ -69,7 +70,8 @@ def run() -> pd.DataFrame:
                 te[f"p_{st_}_{ln}"] = model.prob_over(te[f"{st_}_hat"], alpha[st_], ln)
         te["fit_season"] = s
         parts.append(te)
-        g_te = model.game_table(te, te.pts_hat * te.p_play)
+        plain_te = model.predict_stats(te, te.min_hat, co_st, boost=False)
+        g_te = model.game_table(te, plain_te.pts_hat * te.p_play)
         games.append(pd.concat([g_te, model.predict_scores(g_te, co_sc), _results(g_te, tg)], axis=1))
         cards.append({"season": s, **{f"alpha_{k}": v for k, v in alpha.items()},
                       "sd_margin": co_sc["margin"]["sd"], "sd_total": co_sc["total"]["sd"],
