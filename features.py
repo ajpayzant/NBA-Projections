@@ -237,13 +237,16 @@ def absences(pg: pd.DataFrame, pf: pd.DataFrame) -> pd.DataFrame:
     """Per team-game: the usual minutes and usage-minutes of regulars who are not available."""
     d = pd.concat([pg[["game_id", "date", "team", "player"]], pf[["ew_min_l", "rel_usg"]]], axis=1)
     games = d.drop_duplicates(["game_id", "team"]).sort_values("date")
-    # each player's teams over time, so a traded player stops counting as missing for his old team
+    # each player's teams over time: a regular counts as missing only while he is still the
+    # team's player, i.e. his next game is for this team. A player traded, released or gone in
+    # the offseason is not an absence (live, the roster says the same); before this, offseason
+    # departures counted as absent for the first 10 games of a season
     hist = {p_: (g.date.to_numpy(), g.team.to_numpy()) for p_, g in d.sort_values("date").groupby("player")}
 
-    def team_before(p_, day):
+    def team_next(p_, day):
         dates, teams = hist[p_]
-        i = np.searchsorted(dates, day) - 1
-        return teams[i] if i >= 0 else None
+        i = np.searchsorted(dates, day)
+        return teams[i] if i < len(dates) else None
     rows = []
     for team, g in games.groupby("team", sort=False):
         ids = g.game_id.tolist()
@@ -256,7 +259,7 @@ def absences(pg: pd.DataFrame, pf: pd.DataFrame) -> pd.DataFrame:
             ids = []
             day = g.date.iloc[k]
             for p_, (k0, m, u) in last_seen.items():
-                if p_ not in here and k - k0 <= 10 and np.isfinite(m) and team_before(p_, day) == team:
+                if p_ not in here and k - k0 <= 10 and np.isfinite(m) and team_next(p_, day) == team:
                     miss_min += m
                     miss_usg += m * (u if np.isfinite(u) else 1.0)
                     if m >= 12:                      # a rotation player: his with/without effects count

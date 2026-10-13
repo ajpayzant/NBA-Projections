@@ -41,6 +41,10 @@ LINES = {"pts": [x + 0.5 for x in range(4, 40)], "reb": [x + 0.5 for x in range(
          "ast": [x + 0.5 for x in range(0, 14)], "fg3m": [x + 0.5 for x in range(0, 8)],
          "pra": [x + 0.5 for x in range(8, 60)], "pr": [x + 0.5 for x in range(6, 50)],
          "pa": [x + 0.5 for x in range(6, 50)], "ra": [x + 0.5 for x in range(2, 25)]}
+DRESS = 14              # players kept available per team (see lineups)
+SPARE = "Outside the rotation"   # left out by DRESS: not an absence (no minutes to hand out)
+NEW_PLAYER_MIN = 10.0   # usual minutes assumed for a player with no NBA history, for that ranking
+STALE_DAYS = 30         # a last game older than this (the offseason) does not set the starters
 # chance he plays, from an injury tag (ESPN status or Rotowire's tag)
 PLAY_PROB = {"out": 0.0, "doubtful": 0.2, "doubt": 0.2, "questionable": 0.5, "ques": 0.5, "gtd": 0.6,
              "game time decision": 0.6, "day-to-day": 0.75, "probable": 0.9, "prob": 0.9}
@@ -114,12 +118,22 @@ def injuries() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def rotowire() -> dict[str, dict]:
-    """Rotowire's lineups page: per team, the lineup status (Confirmed / Expected), the
-    starting five and the may-not-play list (name, injury tag, play likelihood)."""
+def rotowire(day: str | None = None) -> dict[str, dict]:
+    """Rotowire's lineups page for `day` (it publishes today and tomorrow): per team, the lineup
+    status (Confirmed / Expected), the starting five and the may-not-play list (name, injury
+    tag, play likelihood). Empty for any other date, or if the page is for another date."""
+    day = day or datetime.now(ET).date().isoformat()
+    today = datetime.now(ET).date()
+    which = {today.isoformat(): "", (today + timedelta(days=1)).isoformat(): "?date=tomorrow"}.get(day)
+    if which is None:
+        return {}
     try:
-        html = requests.get(C.ROTOWIRE_LINEUPS, headers={"User-Agent": C.USER_AGENT}, timeout=C.REQUEST_TIMEOUT).text
+        html = requests.get(C.ROTOWIRE_LINEUPS + which, headers={"User-Agent": C.USER_AGENT},
+                            timeout=C.REQUEST_TIMEOUT).text
     except Exception:
+        return {}
+    shown = re.search(r"Starting lineups for ([A-Z][a-z]+ \d{1,2}, \d{4})", html)
+    if not shown or datetime.strptime(shown.group(1), "%B %d, %Y").date().isoformat() != day:
         return {}
     html = re.sub(r"<style.*?</style>|<script.*?</script>", "", html, flags=re.S)
     out = {}
@@ -168,7 +182,7 @@ def lineups(state: dict, day: str, use_sources: bool = True) -> dict[str, dict]:
     """Per team playing on `day`: {player: chance he plays}, starters, minutes overrides, source."""
     games = state["games"][state["games"].date == day]
     teams = sorted(set(games.home) | set(games.away))
-    rw = rotowire() if use_sources else {}
+    rw = rotowire(day) if use_sources else {}
     inj = injuries() if use_sources else pd.DataFrame(columns=["player", "status", "note"])
     status = dict(zip(inj.player, inj.status)) if len(inj) else {}
     out = {}
@@ -180,7 +194,9 @@ def lineups(state: dict, day: str, use_sources: bool = True) -> dict[str, dict]:
             avail[int(p)] = PLAY_PROB.get(st, 1.0)
             why[int(p)] = st.title() if st else ""
         last = state["last_starters"].get(t, [])
-        starters, source = [p for p in last if avail.get(p, 0) >= 0.5][:5], "last game"
+        stale = (pd.Timestamp(day) - pd.Timestamp(state.get("last_game", {}).get(t, day))).days > STALE_DAYS
+        starters, source = ([], "usual minutes") if stale else ([p for p in last if avail.get(p, 0) >= 0.5][:5], "last game")
+        named = set()
         info = rw.get(t)
         if info:
             ids = [match(s["name"], r) for s in info["starters"]]
@@ -189,10 +205,12 @@ def lineups(state: dict, day: str, use_sources: bool = True) -> dict[str, dict]:
                 starters, source = ids[:5], f"Rotowire {info['status'] or 'lineup'}".strip()
                 for i in ids:
                     avail[i] = max(avail.get(i, 0.0), 0.9)
+            named |= set(ids)
             for m in info["maybe"]:
                 i = match(m["name"], r)
                 if i is None:
                     continue
+                named.add(i)
                 prob = PLAY_PROB.get(m["tag"].lower(), m["pct"] if m["pct"] is not None else 0.5)
                 if m["pct"] is not None:
                     prob = min(prob, m["pct"]) if m["tag"] else m["pct"]
@@ -204,6 +222,16 @@ def lineups(state: dict, day: str, use_sources: bool = True) -> dict[str, dict]:
                 break
             if p not in starters and avail[p] >= 0.5:
                 starters.append(p)
+        # a team dresses about 13 (the backtest's players: median 13, at most 15), but the ESPN
+        # roster lists everyone under contract, two-ways and camp invites included. Beyond
+        # DRESS, the players with the least usual minutes are left out (an override can add them)
+        cand = [p for p, a in avail.items() if a >= 0.5]
+        if len(cand) > DRESS:
+            keep = set(starters) | named
+            rest = sorted((p for p in cand if p not in keep), key=lambda p: -ew.get(p, NEW_PLAYER_MIN))
+            spare = rest[max(DRESS - len(keep & set(cand)), 0):]
+            for p in spare:
+                avail[p], why[p] = 0.0, SPARE
         out[t] = {"avail": avail, "why": why, "starters": starters, "minutes": {}, "source": source,
                   "rotowire": info["status"] if info else ""}
     for k, v in load_overrides().items():
@@ -238,15 +266,17 @@ def save_override(day: str, team: str, lineup: dict | None) -> None:
 
 # ---------------------------------------------------------------- projection
 
-def _absences(rows: pd.DataFrame, state: dict) -> pd.DataFrame:
-    """Tonight's absence features for the players who will play, from the team's regulars."""
+def _absences(rows: pd.DataFrame, state: dict, spare: dict[str, set] | None = None) -> pd.DataFrame:
+    """Tonight's absence features for the players who will play, from the team's regulars.
+    spare: per team, players left out only to keep the team to a dressed list (not absent)."""
     rows = rows.copy()
+    spare = spare or {}
     pairs_u, pairs_m = state["pairs_usg"], state["pairs_min"]
     for c in ("miss_min", "miss_usg", "wowy_usg", "wowy_min"):
         rows[c] = 0.0
     rows["missing_ids"] = [[] for _ in range(len(rows))]
     for (gid, team), idx in rows.groupby(["game_id", "team"]).groups.items():
-        here = set(rows.loc[idx, "player"])
+        here = set(rows.loc[idx, "player"]) | spare.get(team, set())
         regs = state["regulars"].get(team, {})
         missing = {p: v for p, v in regs.items() if p not in here}
         mm = sum(v[0] for v in missing.values())
@@ -269,7 +299,9 @@ def project(state: dict, day: str, lu: dict[str, dict]) -> pd.DataFrame:
     s["p_avail"] = [lu.get(t, {}).get("avail", {}).get(int(p), 0.0) for t, p in zip(s.team, s.player)]
     s = s[s.p_avail >= 0.5].copy()                              # projected as playing
     s["starter"] = [int(p) in lu.get(t, {}).get("starters", []) for t, p in zip(s.team, s.player)]
-    s = _absences(s, state)
+    spare = {t: {p for p, w in l.get("why", {}).items() if w == SPARE and l["avail"].get(p, 0) < 0.5}
+             for t, l in lu.items()}
+    s = _absences(s, state, spare)
     d = model.prepare(s)
     co = state["coefs"]
     d["min_hat"], d["p_play"] = model.predict_minutes(d, co["min"])
@@ -368,7 +400,7 @@ def build_state(fetch_new: bool = True, verbose: bool = True) -> dict:
     slate = f[f.pending].reset_index(drop=True)
     # each team's regulars going into tonight (available in any of its last 10 games): usual
     # minutes and usage, from the pending rows (their states as of tonight)
-    regulars, usual_min, last_starters = {}, {}, {}
+    regulars, usual_min, last_starters, last_game = {}, {}, {}, {}
     done = f[~f.pending]
     for t in teams:
         tgm = done[done.team == t].drop_duplicates("game_id").sort_values("date").game_id.tail(10)
@@ -381,11 +413,12 @@ def build_state(fetch_new: bool = True, verbose: bool = True) -> dict:
         if len(last):
             lg = last[last.game_id == last.game_id.iloc[-1]]
             last_starters[t] = [int(x) for x in lg[lg.starter].player]
+            last_game[t] = str(pd.Timestamp(lg.date.iloc[0]).date())
     # with/without pair effects as of now (the latest state of every pair)
     states_u, states_m = features.LAST_PAIRS["usg"], features.LAST_PAIRS["min"]
     state = {"built_at": datetime.now(ET).isoformat(timespec="minutes"), "games": games, "rosters": rosters,
              "slate": slate, "coefs": {"min": co_min, "stats": co_st, "alpha": alpha, "scores": co_sc},
-             "regulars": regulars, "usual_min": usual_min, "last_starters": last_starters,
+             "regulars": regulars, "usual_min": usual_min, "last_starters": last_starters, "last_game": last_game,
              "pairs_usg": {k: float(v[1][-1]) for k, v in states_u.items() if len(v[1])},
              "pairs_min": {k: float(v[1][-1]) for k, v in states_m.items() if len(v[1])},
              "history_games": done[["game_id", "date", "season", "season_type", "team", "opp", "is_home", "player", "name",

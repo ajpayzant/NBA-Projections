@@ -153,14 +153,16 @@ def predict_minutes(d: pd.DataFrame, co: dict, normalise: bool = True) -> tuple[
     p_play = pd.Series(1 / (1 + np.exp(-(Xp.to_numpy() @ np.array([co["play"][c] for c in Xp.columns])))), index=d.index)
     p_play = p_play.where(~d.starter, 1.0)
     if normalise:
-        # make the team's expected minutes add up to 240 + overtime. Extra minutes go to
-        # players with room below a ceiling (coaches cap stars at ~36 even when teammates are
-        # out and play the deep bench more); a surplus comes off in proportion to minutes.
+        # make the team's expected minutes add up to 240 + overtime. Both ways the change goes
+        # to players with room below a ceiling: coaches cap stars at ~36 even when teammates are
+        # out and play the deep bench more, and trim the bench, not the stars, on a deep night
+        # (a cut in proportion to minutes left stars 2.2 short on teams over 255, 2024-26)
         key = [d.game_id, d.team]
         gap = EXP_MIN - (m_if * p_play).groupby(key).transform("sum")
         room = (CEILING - m_if).clip(lower=0) * p_play
         add = gap.clip(lower=0) * room / room.groupby(key).transform("sum").where(lambda x: x > 0) / p_play
-        cut = gap.clip(upper=0) * m_if / (m_if * p_play).groupby(key).transform("sum")
+        give = (CEILING - m_if).clip(lower=1) * p_play
+        cut = gap.clip(upper=0) * give / give.groupby(key).transform("sum") / p_play
         m_if = (m_if + add.fillna(0) + cut.fillna(0)).clip(1, 46)
     return m_if, p_play
 

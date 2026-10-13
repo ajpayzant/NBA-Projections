@@ -1,4 +1,4 @@
-"""NBA player game projections: Slate · Game · Lineups & minutes · Player · How it works.
+"""NBA player game projections: Slate · Game · Lineups & minutes · Player · Edges · Results · How it works.
 
     run_app.bat            # http://localhost:8680
 """
@@ -14,7 +14,11 @@ import streamlit as st
 from scipy import stats
 
 import config as C
+import edges
+import linecheck
 import live
+import odds
+import tracking
 
 st.set_page_config(page_title="NBA Player Projections", layout="wide")
 PROJ, ACT, MUTED = "#2a78d6", "#eb6834", "#8a8984"   # same palette as the NHL tool
@@ -601,6 +605,342 @@ def splits(h: pd.DataFrame, r, s: dict):
                f"(since {first:%Y}). {line_col} = tonight's fair points line.")
 
 
+# ---------------------------------------------------------------- Edges
+
+EDGE_TYPES = {"Moneyline": "Moneyline", "Spread": "Spread", "Total": "Total", "PTS": "Points", "REB": "Rebounds",
+              "AST": "Assists", "3PM": "Threes", "PRA": "Pts + reb + ast", "P+R": "Pts + reb", "P+A": "Pts + ast",
+              "R+A": "Reb + ast", "Double-double": "Double-double", "Triple-double": "Triple-double"}
+ODDS_COOLDOWN_MIN = 2   # the Refresh odds button: stops double clicks and public-app spam
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _odds(mtime: float) -> pd.DataFrame | None:
+    return odds.load()
+
+
+@st.cache_data(show_spinner="Comparing prices with the projections...", max_entries=8)
+def _edges(odds_mtime: float, day: str, built_at: str, lu_key: str) -> tuple[pd.DataFrame, dict]:
+    """The full comparison, cached until the odds, the projections or a lineup change, so
+    filtering and sorting the table is instant."""
+    s = state()
+    return edges.compare(_odds(odds_mtime), s["games"], projections(day), game_lines(day), s["coefs"]["alpha"])
+
+
+# market -> (bet type in edges.KIND, projection column)
+CHECK_MARKETS = {"Points": ("PTS", "pts"), "Rebounds": ("REB", "reb"), "Assists": ("AST", "ast"),
+                 "Threes": ("3PM", "fg3m"), "Pts + reb + ast": ("PRA", "pra"), "Pts + reb": ("P+R", "pr"),
+                 "Pts + ast": ("P+A", "pa"), "Reb + ast": ("R+A", "ra"),
+                 "Double-double": ("Double-double", "p_dd"), "Triple-double": ("Triple-double", "p_td"),
+                 "Moneyline": ("Moneyline", None), "Spread": ("Spread", None), "Total": ("Total", None)}
+PLAY_EDGE = 0.05   # below about 5 points the books' margin usually eats the edge
+
+
+def _odds_in(label: str, default: str, key: str, help: str | None = None) -> float | None:
+    raw = st.text_input(label, value=default, key=key, help=help).strip().replace("+", "")
+    try:
+        v = float(raw)
+    except ValueError:
+        return None
+    return v if abs(v) >= 100 else None
+
+
+def check_line(day: str, s: dict, expanded: bool = False):
+    """Price one line typed in from a book against tonight's projection."""
+    with st.expander("Check a line from a book", expanded=expanded):
+        p = projections(day)
+        games = games_on(day)
+        if p.empty or games.empty:
+            st.info("No projections for this date.")
+            return
+        c1, c2, c3 = st.columns([2, 2, 3])
+        market = c1.selectbox("Market", list(CHECK_MARKETS), key="chk_market")
+        glab = {r.game_id: f"{r.away} @ {r.home}" for r in games.itertuples()}
+        gid = c2.selectbox("Game", list(glab), format_func=glab.get, key="chk_game")
+        g = games[games.game_id == gid].iloc[0]
+        kind, col = CHECK_MARKETS[market]
+        d1, d2, d3, d4 = st.columns(4)
+        side, line = None, None
+        if market in ("Moneyline", "Spread", "Total"):
+            gl = game_lines(day)
+            ln = gl[gl.game_id == gid].iloc[0]
+            pts = team_points(ln)
+            if market == "Total":
+                side = d1.segmented_control("Side", ["Over", "Under"], default="Over", key="chk_ou") or "Over"
+                line = d2.number_input("Line", value=float(np.floor(ln.total_hat)) + 0.5, step=0.5, key="chk_tot")
+                win_push = linecheck.game(ln.margin_hat, ln.total_hat, ln.sd_margin, ln.sd_total, "Total", True, line,
+                                          side == "Over")
+                proj_text = f"{ln.total_hat:.1f} total points projected"
+                bet = f"{side} {line:g}, {glab[gid]}"
+            else:
+                team = c3.segmented_control("Team", [g.away, g.home], default=g.away, key="chk_team") or g.away
+                opp = g.home if team == g.away else g.away
+                fair = -(pts[team] - pts[opp])
+                line = 0.0 if market == "Moneyline" else d2.number_input(
+                    "Spread", value=float(np.floor(fair)) + 0.5, step=0.5, key="chk_sp",
+                    help="This team's spread, e.g. -4.5 or +4.5")
+                win_push = linecheck.game(ln.margin_hat, ln.total_hat, ln.sd_margin, ln.sd_total, market,
+                                          team == g.home, line)
+                proj_text = f"projected score {team} {pts[team]:.1f} – {pts[opp]:.1f} {opp}"
+                bet = f"{team} {'moneyline' if market == 'Moneyline' else f'{line:+g}'}"
+        else:
+            sort_col = "min_hat" if col.startswith("p_") else f"{col}_hat"
+            pg = p[p.game_id == gid].sort_values(sort_col, ascending=False)
+            who = c3.selectbox("Player", pg.index, format_func=lambda i: f"{pg.at[i, 'name']} · {pg.at[i, 'team']}",
+                               key="chk_player")
+            r = pg.loc[who]
+            if col.startswith("p_"):
+                side = d1.segmented_control("Side", ["Yes", "No"], default="Yes", key="chk_yn") or "Yes"
+                win_push = (float(r[col]) if side == "Yes" else 1 - float(r[col]), 0.0)
+                proj_text = (f"{r.pts_hat:.1f} pts, {r.reb_hat:.1f} reb, {r.ast_hat:.1f} ast projected "
+                             f"({r.min_hat:.0f} min)")
+                bet = f"{r['name']} {market.lower()} {side.lower()}"
+            else:
+                side = d1.segmented_control("Side", ["Over", "Under"], default="Over", key="chk_p_ou") or "Over"
+                line = d2.number_input("Line", value=float(fair_line(r, col)), step=0.5, key=f"chk_line_{col}")
+                win_push = linecheck.prop(float(r[f"{col}_hat"]), s["coefs"]["alpha"][col], line, side == "Over")
+                proj_text = (f"{r[f'{col}_hat']:.{2 if col == 'fg3m' else 1}f} {market.lower()} projected "
+                             f"({r.min_hat:.0f} min)")
+                bet = f"{r['name']} {side.lower()} {line:g} {market.lower()}"
+        with d3:
+            price = _odds_in("Book odds", "-110", "chk_odds", "American odds, e.g. -115 or +130")
+        with d4:
+            other = _odds_in("Other side's odds (optional)", "", "chk_other",
+                             "Adding the other side's price removes the book's margin from its probability")
+        if price is None:
+            st.warning("Enter the book's odds as an American price, e.g. -115 or +130.")
+            return
+        ev = linecheck.evaluate(*win_push, price, other)
+        if kind == "Moneyline":
+            side = "Favourite" if ev["book_p"] >= 0.5 else "Underdog"
+        elif kind == "Spread":
+            side = "Favourite -" if line < 0 else "Underdog +"
+        a, b, c, d, e = st.columns(5)
+        a.metric("Our probability", f"{ev['p']:.1%}", border=True, help="Given no push" if ev["push"] > 0 else None)
+        b.metric("Our fair odds", american(ev["p"]), border=True, help="The price with no margin, by the model")
+        c.metric("Book probability", f"{ev['book_p']:.1%}", border=True,
+                 help="Margin removed" if ev["novig"] else "Includes the book's margin; add the other side to remove it")
+        d.metric("Edge", f"{100 * ev['edge']:+.1f} pts", border=True, help="Our probability minus the book's")
+        e.metric("EV per $100", f"{ev['ev']:+.2f}", border=True, help="Expected profit at the book's odds, by the model")
+        bt = results("Backtest")
+        hist_txt, roi_hi = "", None
+        if len(bt):
+            h = bt[(bt.snap == "close") & (bt.kind == kind) & (bt.side == side) & (bt.bucket.map(BUCKET_LO) >= PLAY_EDGE)]
+            if h.bets.sum() >= 20:
+                roi_hi = h.pnl.sum() / h.bets.sum()
+                hist_txt = (f"Backtest, {EDGE_TYPES[kind].lower()} {side.lower()} bets with a {PLAY_EDGE:.0%}+ edge at "
+                            f"the close: {roi_hi:+.1%} ROI on {int(h.bets.sum()):,} bets.")
+        msg = f"**{bet}** at {price:+.0f}: {proj_text}."
+        if ev["ev"] <= 0 or ev["edge"] < 0.02:
+            st.error(f"No edge. {msg} The book's price is at or above the model's fair value.")
+        elif ev["edge"] < PLAY_EDGE:
+            st.warning(f"Small edge. {msg} Edges this small rarely beat the books' margin.")
+        elif roi_hi is not None and roi_hi < 0:
+            st.warning(f"Edge, but this market has not paid historically. {msg} {hist_txt}")
+        else:
+            st.success(f"Edge worth a look. {msg} Check the injury report and lineup news before playing.")
+        if hist_txt or ev["push"] > 0:
+            st.caption(hist_txt + (f" Push chance {ev['push']:.0%}, refunded." if ev["push"] > 0 else ""))
+
+
+def page_edges():
+    s = state() or no_state()
+    day = pick_day(s)
+    st.title(f"Edges · {day}")
+    o = _odds(odds.ODDS_FILE.stat().st_mtime) if odds.ODDS_FILE.exists() else None
+    head, btn = st.columns([5, 1], vertical_alignment="bottom")
+    if odds.api_key() is not None:   # odds update only when someone clicks (no automatic fetches)
+        last = pd.Timestamp(o.fetched_at.iloc[0]) if o is not None and len(o) else None
+        wait = last is not None and pd.Timestamp.now(tz="UTC") - last < pd.Timedelta(minutes=ODDS_COOLDOWN_MIN)
+        if btn.button("Refresh odds", type="primary", disabled=wait, width="stretch",
+                      help=f"Fetch the latest sportsbook prices now (about 3 API credits, plus up to 10 per game "
+                           f"starting in the next {odds.PROPS_HOURS} hours). At most once every "
+                           f"{ODDS_COOLDOWN_MIN} minutes."):
+            with st.spinner("Fetching sportsbook odds..."):
+                try:
+                    odds.fetch(verbose=False)
+                except Exception as e:
+                    st.error(f"Could not fetch odds: {e}")
+                    st.stop()
+            _odds.clear()
+            st.rerun()
+    check_line(day, s, expanded=o is None or o.empty)
+    if o is None or o.empty:
+        head.info("No sportsbook odds yet. Click **Refresh odds** to fetch them (needs `odds_api_key` in the "
+                  "app's secrets, or in `.streamlit/secrets.toml` locally).")
+        return
+    p = projections(day)
+    if p.empty:
+        st.info("Nothing to project for this date.")
+        return
+    lu = lineups(day)
+    df, stats_ = _edges(odds.ODDS_FILE.stat().st_mtime, day, s["built_at"], json.dumps(lu, sort_keys=True, default=str))
+    head.caption("Sportsbook prices compared with the model's own probability for the same bet. "
+                 "Odds update only when you click Refresh odds.")
+    if df.empty:
+        st.info("No pregame odds match this date's games yet. Books post most player props on game day.")
+        return
+    df = df.assign(type=df.kind.map(EDGE_TYPES))
+    shown = df[df.book_p.notna()].sort_values("dec", ascending=False).drop_duplicates(["game_id", "market", "bet"])
+    t_up = pd.Timestamp(o.fetched_at.iloc[0]).tz_convert("America/New_York")
+    a, b, c, d = st.columns(4)
+    a.metric("Odds updated", t_up.strftime("%I:%M %p ET").lstrip("0"), border=True, help=t_up.strftime("%a %b %d, %Y"))
+    b.metric("Sportsbooks", f"{df.book.nunique()}", border=True)
+    c.metric("Bets priced", f"{len(shown):,}", border=True)
+    d.metric("Positive EV", f"{(shown.ev > 0).sum():,}", border=True,
+             help="Bets where the model's probability beats the best available price")
+
+    c1, c2, c3, c4 = st.columns(4)
+    game_order = df.sort_values("commence_time").game.drop_duplicates().tolist()
+    games_sel = c1.multiselect("Game", game_order, key="edge_games")
+    pool = df[df.game.isin(games_sel)] if games_sel else df
+    plab = pool[pool.team.notna()].drop_duplicates("subject")
+    plab = dict(zip(plab.subject, plab.subject + " (" + plab.team.astype(str) + ")"))
+    players = c2.multiselect("Player", sorted(plab), format_func=plab.get, key="edge_players",
+                             placeholder="Search a player", help="Every line posted for him, whatever its EV")
+    kind = c3.multiselect("Bet type", [k for k in EDGE_TYPES.values() if k in set(df.type)], key="edge_type")
+    books = c4.multiselect("Sportsbooks", sorted(df.book.unique()), key="edge_books")
+    c5, c6, c7, c8, _ = st.columns([1, 1, 1, 1, 2], vertical_alignment="bottom")
+    min_ev = c5.number_input("Min EV %", value=0.0, step=1.0, format="%.0f", key="edge_min",
+                             disabled=bool(players), help="Ignored while a player is picked")
+    sort = c6.selectbox("Sort by", ["EV", "Edge"], key="edge_sort",
+                        help="EV ranks by expected profit (it favours long odds); Edge by the probability gap")
+    best = c7.toggle("Best price", value=True, key="edge_best", help="One row per bet, at the book with the best odds")
+    both = c8.toggle("Both sides", value=True, key="edge_both",
+                     help="Only bets the book posts both sides of, so its probability can be read without its margin. "
+                          "Double- and triple-doubles are posted as Yes only and always shown, against the book's "
+                          "probability with its margin left in.")
+    q = df[df.game.isin(games_sel)] if games_sel else df
+    q = q[q.subject.isin(players)] if players else q
+    q = q[q.type.isin(kind)] if kind else q
+    q = q[q.book.isin(books)] if books else q
+    q = q[q.novig.notna() | q.one_sided] if both else q
+    if best:
+        q = q.sort_values("dec", ascending=False).drop_duplicates(["game_id", "market", "bet"])
+    q = q if players else q[q.ev * 100 >= min_ev]
+    q = q.sort_values("ev" if sort == "EV" else "edge", ascending=False)
+    t = pd.DataFrame({"Game": q.game, "Bet": q.subject, "Line": q.line, "Projection": q.proj_text,
+                      "Book": q.book, "Book odds": [f"{x:+.0f}" for x in q.price], "Our odds": q.p_model.map(american),
+                      "Book %": (q.book_p * 100).round(), "Our %": (q.p_model * 100).round(),
+                      "Edge": q.edge * 100, "EV": q.ev * 100})
+    bar = lambda h: st.column_config.ProgressColumn(format="%d%%", min_value=0, max_value=100, width="small", help=h)
+    st.dataframe(t, hide_index=True, width="stretch", height=720, column_config={
+        "Game": st.column_config.TextColumn(width="small", pinned=True),
+        "Bet": st.column_config.TextColumn(width="medium", pinned=True, help="The player, the team, or the game total"),
+        "Line": st.column_config.TextColumn(help="The bet as the book lists it"),
+        "Projection": st.column_config.TextColumn(
+            help="The model's number for this bet: the player's projected stat, the projected total, or the "
+                 "projected score (this team first)"),
+        "Book": st.column_config.TextColumn(width="small"),
+        "Book odds": st.column_config.TextColumn(width="small", help="The book's price"),
+        "Our odds": st.column_config.TextColumn(width="small", help="The model's fair price (no margin)"),
+        "Book %": bar("The book's probability with its margin removed (double / triple-double: with it)"),
+        "Our %": bar("The model's probability, for a game he plays"),
+        "Edge": st.column_config.NumberColumn(format="%+.1f", width="small",
+                                              help="Our % minus Book %, in percentage points"),
+        "EV": st.column_config.NumberColumn(format="%+.1f%%", width="small",
+                                            help="Expected profit per $100 bet at the book's odds, by the model")})
+    st.caption("**Book %** the book's probability without its margin · **Our %** the model's · **Edge** Our % − Book % · "
+               "**EV** expected profit per $100 at the book's odds. Player props are priced for a game he plays (books "
+               "void them otherwise). Books often hear about late scratches and minutes limits first, so check the "
+               "injury report before trusting a big edge. "
+               f"Matched {stats_.get('player props matched', 0):,} of {stats_.get('player props', 0):,} player prices "
+               "to tonight's projections.")
+    st.download_button("Download CSV", t.to_csv(index=False), f"edges_{day}.csv", "text/csv")
+
+
+# ---------------------------------------------------------------- Results
+
+RESULT_FILES = {"Live (this season)": tracking.RESULTS_LIVE, "Backtest": tracking.RESULTS_BACKTEST}
+EDGE_MIN = {"All bets": None, "Edge 0%+": 0.0, "Edge 2%+": 0.02, "Edge 5%+": 0.05, "Edge 8%+": 0.08, "Edge 12%+": 0.12}
+BUCKET_LO = {lab: lo for lo, _, lab in tracking.BUCKETS}
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _results(path: str, mtime: float) -> pd.DataFrame:
+    return pd.read_parquet(path)
+
+
+def results(name: str) -> pd.DataFrame:
+    p = RESULT_FILES[name]
+    return _results(str(p), p.stat().st_mtime) if p.exists() else pd.DataFrame()
+
+
+def page_results():
+    st.title("Results")
+    st.caption("The model's projections graded against the sportsbooks' opening (10 AM ET) and closing lines: "
+               "1-unit bets at the best price of DraftKings, FanDuel, BetMGM, Caesars and Fanatics.")
+    c1, c2, c3, c4 = st.columns([2, 1, 2, 1], vertical_alignment="bottom")
+    first = "Live (this season)" if not results("Live (this season)").empty else "Backtest"
+    src = c1.segmented_control("Results", list(RESULT_FILES), default=first, key="res_src") or first
+    snap = c2.segmented_control("Price", ["Close", "Open"], default="Close", key="res_snap") or "Close"
+    r = results(src)
+    if r.empty:
+        st.info("No graded games yet. `python tracking.py snapshot` stores each day's final projections and "
+                "`python tracking.py grade` grades them the next morning against the opening and closing lines.")
+        return
+    r = r[r.snap == snap.lower()]
+    kinds = [k for k in EDGE_TYPES if k in set(r.kind)]
+    kind = c3.multiselect("Bet type", kinds, format_func=EDGE_TYPES.get, key="res_kind")
+    th = EDGE_MIN[c4.selectbox("Bets", list(EDGE_MIN), index=3, key="res_edge",
+                               help="Only bets where the model's probability beat the books' no-vig "
+                                    "probability by at least this much")]
+    q = r[r.kind.isin(kind)] if kind else r
+    sel = q if th is None else q[q.bucket.map(BUCKET_LO) >= th]
+    bets, wins, pnl = sel.bets.sum(), sel.wins.sum(), sel.pnl.sum()
+    acc = q[q.primary]
+    a, b, c, d = st.columns(4)
+    a.metric("Bets", f"{int(bets):,}", border=True, help=f"{q.date.min()} to {q.date.max()}" if len(q) else None)
+    b.metric("Win rate", f"{wins / bets:.1%}" if bets else "—", border=True)
+    c.metric("ROI", f"{pnl / bets:+.1%}" if bets else "—", border=True, help="Profit per unit staked")
+    d.metric("Profit", f"{pnl:+,.1f} u" if bets else "—", border=True, help="Units won at 1 unit per bet")
+
+    def table(by: list[str]) -> pd.DataFrame:
+        g = sel.groupby(by, observed=True)[["bets", "wins", "pnl"]].sum().reset_index()
+        g = g[g.bets > 0]
+        g["Win %"] = 100 * g.wins / g.bets
+        g["ROI"] = 100 * g.pnl / g.bets
+        return g
+
+    roi = st.column_config.NumberColumn(format="%+.1f%%", width="small")
+    left, right = st.columns([3, 2], gap="large")
+    with left:
+        st.markdown("**By market and side**")
+        t = table(["kind", "side"])
+        t = t.assign(kind=t.kind.map(EDGE_TYPES)).rename(columns={"kind": "Market", "side": "Side", "bets": "Bets",
+                                                                  "pnl": "Profit (u)"})
+        t["order"] = t.Market.map({v: i for i, v in enumerate(EDGE_TYPES.values())})
+        st.dataframe(t.sort_values(["order", "Side"])[["Market", "Side", "Bets", "Win %", "ROI", "Profit (u)"]],
+                     hide_index=True, width="stretch", height=35 * (len(t) + 1) + 3, column_config={
+                         "Win %": st.column_config.NumberColumn(format="%.1f%%", width="small"), "ROI": roi,
+                         "Profit (u)": st.column_config.NumberColumn(format="%+.1f", width="small")})
+    with right:
+        st.markdown("**By edge**")
+        e = q.groupby("bucket", observed=True)[["bets", "wins", "pnl"]].sum().reset_index()
+        e["lo"] = e.bucket.map(BUCKET_LO)
+        e = e.sort_values("lo")
+        e = pd.DataFrame({"Model edge": e.bucket, "Bets": e.bets, "Win %": 100 * e.wins / e.bets,
+                          "ROI": 100 * e.pnl / e.bets})
+        st.dataframe(e, hide_index=True, width="stretch", column_config={
+            "Win %": st.column_config.NumberColumn(format="%.1f%%", width="small"), "ROI": roi})
+        if acc.bets.sum():
+            st.caption(f"Accuracy (log loss, lower is better): model **{acc.ll_model.sum() / acc.bets.sum():.4f}** · "
+                       f"books **{acc.ll_mkt.sum() / acc.bets.sum():.4f}**, on {int(acc.bets.sum()):,} bets "
+                       "(all edges, one side per bet)")
+    daily = sel.groupby("date").pnl.sum().sort_index().cumsum().reset_index()
+    if len(daily) > 1:
+        daily["date"] = pd.to_datetime(daily.date)
+        ch = alt.Chart(daily).mark_line(color=PROJ, strokeWidth=2).encode(
+            x=alt.X("date:T", title=None), y=alt.Y("pnl:Q", title="Cumulative profit (units)"),
+            tooltip=[alt.Tooltip("date:T"), alt.Tooltip("pnl:Q", format="+.1f", title="Profit")])
+        zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color=MUTED, strokeDash=[4, 4]).encode(y="y:Q")
+        st.markdown("**Running profit**")
+        st.altair_chart((zero + ch).properties(height=260), width="stretch")
+    st.caption("Edge = the model's probability minus the books' consensus no-vig probability (double- and "
+               "triple-doubles: the implied probability, margin included, as books post only Yes). Player props are "
+               "graded only when he played; pushes are left out. Backtest = the walk-forward projections, made with "
+               "who actually played and started, against that day's historical lines.")
+
+
 # ---------------------------------------------------------------- How it works
 
 def page_model():
@@ -610,5 +950,6 @@ def page_model():
 
 _start = os.environ.get("APP_PAGE", "slate")  # headless tests pick the page to open
 PAGES = [("slate", page_slate, "Slate"), ("game", page_game, "Game"), ("lineups", page_lineups, "Lineups & minutes"),
-         ("player", page_player, "Player"), ("model", page_model, "How it works")]
+         ("player", page_player, "Player"), ("edges", page_edges, "Edges"), ("results", page_results, "Results"),
+         ("model", page_model, "How it works")]
 st.navigation([st.Page(f, title=t, url_path=k, default=_start == k) for k, f, t in PAGES]).run()
