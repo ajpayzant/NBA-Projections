@@ -13,7 +13,7 @@ Stages so far: (1) data, model and walk-forward backtest; (2) the live slate and
 |---|---|
 | ESPN public API | box scores, play-by-play, rosters, injuries, schedule (history from 2018-19) |
 | Rotowire NBA lineups | expected / confirmed starting fives, play-likelihood (today's and tomorrow's pages) |
-| The Odds API | sportsbook odds: DraftKings, FanDuel, BetMGM, Caesars, Fanatics (manual refresh only) |
+| OpticOdds | sportsbook odds: DraftKings, FanDuel, BetMGM, Caesars, Fanatics (manual refresh only; the company key) |
 
 The NBA's own stats API and CDN, its injury-report PDFs and lineups.com are blocked from this
 network; Basketball-Reference is reachable but rate-limited by its terms, so it is a fallback only.
@@ -31,9 +31,10 @@ network; Basketball-Reference is reachable but rate-limited by its terms, so it 
 run_app.bat                           # the app, http://localhost:8680
 ```
 
-The odds key goes in `.streamlit/secrets.toml` as `odds_api_key` (gitignored), or `ODDS_API_KEY`
-in the environment. Credits: a Refresh odds is about 3 plus up to 10 per game starting within 30
-hours; grading a day's games is about 200 credits per game (opening and closing lines, 10 prop
+The OpticOdds key goes in `.streamlit/secrets.toml` as `opticodds_api_key` (gitignored), or
+`OPTICODDS_API_KEY` in the environment. A Refresh odds is one OpticOdds call for the slate plus one
+per 5 games starting within 48 hours (no credits, a shared rate limit). Results grading still uses
+The Odds API's historical data (`ODDS_API_KEY`): grading a day's games is about 200 credits per game (opening and closing lines, 10 prop
 markets). Historical prices are cached per day in `data/odds_hist/`, so no day is paid for twice.
 
 ## Files
@@ -48,7 +49,7 @@ markets). Historical prices are cached per day in `data/odds_hist/`, so no day i
 | `model.py` | minutes (if he plays + chance he plays), stats (Poisson GLM), boosted corrections, distributions, game lines |
 | `backtest.py` | walk-forward evaluation vs season-average and last-10 baselines |
 | `live.py` | the live slate: schedule, rosters, Rotowire / ESPN lineups, projections, game lines |
-| `odds.py` | The Odds API fetch (game lines + 10 player-prop markets) |
+| `odds.py` | OpticOdds fetch (game lines + 10 player-prop markets, main lines only) |
 | `linecheck.py` | prices one line with the model's distributions (props, double / triple-double, game lines) |
 | `edges.py` | every book price against the model: no-vig probabilities, edge, EV |
 | `tracking.py` | Results: daily snapshots, grading at the opening and closing lines, historical backtest |
@@ -78,7 +79,7 @@ Deploying (share.streamlit.io -> Create app):
 Secrets (Advanced settings -> Secrets), TOML:
 
 ```toml
-odds_api_key = "..."     # the Edges tab's Refresh odds button
+opticodds_api_key = "..."   # the Edges tab's Refresh odds button
 gist_id      = "..."     # optional: shared lineup overrides that survive app restarts
 github_token = "..."     # optional: fine-grained token with Gists read and write
 ```

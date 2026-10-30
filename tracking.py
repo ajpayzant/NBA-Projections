@@ -20,6 +20,7 @@ are published with the app's data. Profit is per 1-unit bet at the best of the f
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -32,7 +33,6 @@ import config as C
 import edges
 import live
 import model
-import odds
 import parse
 
 TRACK = C.DATA / "tracking"
@@ -40,6 +40,34 @@ HIST_DIR = C.DATA / "odds_hist"      # raw historical prices per day (local only
 RESULTS_LIVE = TRACK / "results_live.parquet"
 RESULTS_BACKTEST = TRACK / "results_backtest.parquet"
 HIST = "https://api.the-odds-api.com/v4/historical/sports/basketball_nba"
+# The Odds API (the Edges tab now uses OpticOdds, odds.py): its book keys, markets and key
+HIST_BOOKS = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betmgm": "BetMGM", "williamhill_us": "Caesars",
+              "fanatics": "Fanatics"}
+GAME_MARKETS = ["h2h", "spreads", "totals"]
+PROP_MARKETS = ["player_points", "player_rebounds", "player_assists", "player_threes",
+                "player_points_rebounds_assists", "player_points_rebounds", "player_points_assists",
+                "player_rebounds_assists", "player_double_double", "player_triple_double"]
+
+
+def api_key() -> str | None:
+    """The Odds API key: ODDS_API_KEY in the environment (the workflow's repo secret)."""
+    return os.environ.get("ODDS_API_KEY")
+
+
+def _rows(ev: dict, fetched_at: str) -> list[dict]:
+    """A The Odds API event in odds.py's row format."""
+    out = []
+    for bk in ev.get("bookmakers", []):
+        for mk in bk.get("markets", []):
+            for o in mk.get("outcomes", []):
+                out.append({"event_id": ev["id"], "commence_time": ev["commence_time"],
+                            "home": ev["home_team"], "away": ev["away_team"],
+                            "book": bk.get("title") or bk["key"], "market": mk["key"],
+                            "name": o.get("name"), "player": o.get("description"),
+                            "point": o.get("point"), "price": o.get("price"),
+                            "last_update": mk.get("last_update") or bk.get("last_update"),
+                            "fetched_at": fetched_at})
+    return out
 OPEN_ET = time(10, 0)
 CLOSE_BEFORE = timedelta(minutes=10)
 BUCKETS = [(-1.0, 0.0, "< 0"), (0.0, 0.02, "0-2%"), (0.02, 0.05, "2-5%"), (0.05, 0.08, "5-8%"),
@@ -106,7 +134,7 @@ def snapshot(state: dict | None = None, day: str | None = None, verbose: bool = 
 # ---------------------------------------------------------------- historical odds
 
 def _hist(path: str, key: str, **params) -> dict:
-    r = requests.get(HIST + path, params={"apiKey": key, "bookmakers": ",".join(odds.BOOKS),
+    r = requests.get(HIST + path, params={"apiKey": key, "bookmakers": ",".join(HIST_BOOKS),
                                           "oddsFormat": "american", **params}, timeout=60)
     r.raise_for_status()
     CREDITS["used"] += int(r.headers.get("x-requests-last") or 0)
@@ -129,23 +157,23 @@ def _odds_for(day: str, games: pd.DataFrame, key: str) -> dict[str, pd.DataFrame
     events = _hist("/events", key, date=stamp).get("data", [])
     names = {edges.nick(h) + "|" + edges.nick(a) for h, a in zip(games.home_name, games.away_name)}
     events = [e for e in events if edges.nick(e["home_team"]) + "|" + edges.nick(e["away_team"]) in names]
-    snap = _hist("/odds", key, date=stamp, markets=",".join(odds.GAME_MARKETS)).get("data", [])
-    out["open"] += [r for ev in snap for r in odds._rows(ev, stamp)]
+    snap = _hist("/odds", key, date=stamp, markets=",".join(GAME_MARKETS)).get("data", [])
+    out["open"] += [r for ev in snap for r in _rows(ev, stamp)]
     for start, grp in pd.Series(events, dtype=object).groupby([e["commence_time"] for e in events]):
         close = (pd.Timestamp(start) - CLOSE_BEFORE).strftime("%Y-%m-%dT%H:%M:%SZ")
         ids = {e["id"] for e in grp}
-        snap = _hist("/odds", key, date=close, markets=",".join(odds.GAME_MARKETS)).get("data", [])
-        out["close"] += [r for ev in snap if ev["id"] in ids for r in odds._rows(ev, close)]
+        snap = _hist("/odds", key, date=close, markets=",".join(GAME_MARKETS)).get("data", [])
+        out["close"] += [r for ev in snap if ev["id"] in ids for r in _rows(ev, close)]
         for e in grp:
             for tag, when in (("open", stamp), ("close", close)):
                 if when > close and tag == "open":   # an early tip-off before 10 AM: no opening snapshot
                     continue
                 try:
-                    ev = _hist(f"/events/{e['id']}/odds", key, date=when, markets=",".join(odds.PROP_MARKETS)).get("data")
+                    ev = _hist(f"/events/{e['id']}/odds", key, date=when, markets=",".join(PROP_MARKETS)).get("data")
                 except requests.HTTPError:
                     continue
                 if ev:
-                    out[tag] += odds._rows(ev, when)
+                    out[tag] += _rows(ev, when)
     res = {k: pd.DataFrame(v) for k, v in out.items()}
     HIST_DIR.mkdir(parents=True, exist_ok=True)
     for k, d in res.items():
@@ -159,7 +187,7 @@ def _bets(o: pd.DataFrame, games: pd.DataFrame, pl: pd.DataFrame, gl: pd.DataFra
     """One row per bet side: the model's probability, the books' consensus probability, best price."""
     if o.empty:
         return pd.DataFrame()
-    o = o[o.book.isin(odds.BOOKS.values())]
+    o = o[o.book.isin(HIST_BOOKS.values())]
     df, _ = edges.compare(o, games, pl, gl, alpha, now=pd.Timestamp("1970-01-01", tz="UTC"))
     if df.empty:
         return df
@@ -250,7 +278,7 @@ def _grade_day(day: str, games: pd.DataFrame, pl: pd.DataFrame, gl: pd.DataFrame
 
 def grade(day: str | None = None, verbose: bool = True) -> None:
     """Grade every snapshot day before today that is not graded yet (or just `day`)."""
-    key = odds.api_key()
+    key = api_key()
     if not key:
         if verbose:
             print("tracking: no ODDS_API_KEY, grading skipped")
@@ -297,7 +325,7 @@ def backtest(start: str, end: str, max_credits: int = 50_000, verbose: bool = Tr
     """Grade the backtest's projections against historical lines for regular-season days in
     [start, end], stopping before max_credits are spent. Writes RESULTS_BACKTEST from every
     day graded so far (cached days are free)."""
-    key = odds.api_key()
+    key = api_key()
     B = pd.read_parquet(C.DATA / "backtest" / "backtest.parquet")
     B = B[B.season_type == 2].copy()
     B["date"] = pd.to_datetime(B.date).dt.strftime("%Y-%m-%d")

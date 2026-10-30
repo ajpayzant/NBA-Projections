@@ -769,10 +769,10 @@ def page_edges():
     last = pd.Timestamp(o.fetched_at.iloc[0]) if o is not None and len(o) else None
     wait = last is not None and pd.Timestamp.now(tz="UTC") - last < pd.Timedelta(minutes=ODDS_COOLDOWN_MIN)
     if btn.button("Refresh odds", type="primary", disabled=wait or not has_key, width="stretch",
-                  help=(f"Fetch the latest sportsbook prices now (about 3 API credits, plus up to 10 per game "
-                        f"starting in the next {odds.PROPS_HOURS} hours). At most once every "
+                  help=(f"Fetch the latest sportsbook prices from OpticOdds now (games starting in the next "
+                        f"{odds.HOURS} hours, about one API call per 5 games). At most once every "
                         f"{ODDS_COOLDOWN_MIN} minutes.") if has_key else
-                       "Needs an Odds API key: odds_api_key in the app's secrets"):
+                       "Needs an OpticOdds API key: opticodds_api_key in the app's secrets"):
         with st.spinner("Fetching sportsbook odds..."):
             try:
                 odds.fetch(verbose=False)
@@ -782,7 +782,7 @@ def page_edges():
         _odds.clear()
         st.rerun()
     if not has_key:
-        st.warning("**Refresh odds is off: no Odds API key.** On Streamlit Cloud add `odds_api_key = \"...\"` under "
+        st.warning("**Refresh odds is off: no OpticOdds API key.** On Streamlit Cloud add `opticodds_api_key = \"...\"` under "
                    "the app's Settings -> Secrets (locally: `.streamlit/secrets.toml`). The line checker below works "
                    "without it.")
     check_line(day, s, expanded=o is None or o.empty)
@@ -799,8 +799,7 @@ def page_edges():
     head.caption("Sportsbook prices compared with the model's own probability for the same bet. "
                  "Odds update only when you click Refresh odds.")
     if df.empty:
-        st.info("No pregame odds match this date's games yet. The Odds API lists regular-season and playoff games "
-                "only (no preseason), and books post most player props on game day.")
+        st.info("No pregame odds match this date's games yet. Books post most player props on game day.")
         return
     df = df.assign(type=df.kind.map(EDGE_TYPES))
     shown = df[df.book_p.notna()].sort_values("dec", ascending=False).drop_duplicates(["game_id", "market", "bet"])
